@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import { useDispatch } from "react-redux";
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { addPlayer } from "../redux/features/PlayerSlice";
 import toast from "react-hot-toast";
 import Card from "../components/Card";
+
+const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 
 export default function Team({ data, onUpdateSelection }) {
   const dispatch = useDispatch();
@@ -11,9 +13,44 @@ export default function Team({ data, onUpdateSelection }) {
   const [playerCount, setPlayerCount] = useState("");
   const [players, setPlayers] = useState([]);
 
+  const [teamsData, setTeamsData] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [errorData, setErrorData] = useState(null);
+
+  const teamsArr = [...new Set(teamsData.map((t) => t.team).filter(Boolean))];
+
+  useEffect(() => {
+    setLoadingData(true);
+    setErrorData(null);
+
+    const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
+    fetch(`${BASE_URL}/players.json`)
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        return res.json();
+      })
+      .then((data) => {
+        if (data) {
+          const playersArray = Object.keys(data).map((key) => ({
+            id: key,
+            ...data[key],
+          }));
+          setTeamsData(playersArray);
+        } else {
+          setTeamsData([]);
+        }
+        setLoadingData(false);
+        setErrorData(null);
+      })
+      .catch(() => {
+        setTeamsData([]);
+        setErrorData("فشل تحميل أسماء الفرق المسجلة");
+        setLoadingData(false);
+      });
+  }, []);
+
   // إنشاء الفورمات الفارغة بعد تحديد العدد
   const handleGeneratePlayers = () => {
-    console.log("Generating players:", playerCount);
     const newPlayers = Array.from({ length: playerCount }, () => ({
       name: "",
       phone: "",
@@ -21,11 +58,9 @@ export default function Team({ data, onUpdateSelection }) {
       imageUrl: null,
     }));
     setPlayers(newPlayers);
-    console.log("Players generated:", newPlayers);
   };
 
   const handlePlayerChange = (index, field, value) => {
-    console.log("Changing player:", index, field, value);
     setPlayers((prev) =>
       prev.map((player, i) =>
         i === index ? { ...player, [field]: value } : player
@@ -34,7 +69,6 @@ export default function Team({ data, onUpdateSelection }) {
   };
 
   const handleImageChange = (index, url) => {
-    console.log("Changing image for player:", index, url);
     setPlayers((prev) =>
       prev.map((player, i) =>
         i === index ? { ...player, imageUrl: url } : player
@@ -44,47 +78,43 @@ export default function Team({ data, onUpdateSelection }) {
 
   const isTeamValid =
     teamName &&
+    !teamsArr.includes(teamName) &&
     players.length > 0 &&
     players.every((p) => p.name && p.phone && p.birthdate && p.imageUrl) &&
     !loading;
 
   async function saveTeam() {
-    console.log("Saving team:", teamName, players);
     setLoading(true);
     try {
       for (const player of players) {
         const playerData = {
           name: player.name,
+          image: player.imageUrl || "",
+          gender: data?.gender?.name || "",
+          stage: data?.stage?.name || "",
+          game: data?.game?.name || "",
+          church: data?.church?.name || "",
           phone: player.phone,
           birthdate: player.birthdate,
-          church: data?.church?.name || "",
-          game: data?.game?.name || "",
-          stage: data?.stage?.name || "",
-          image: player.imageUrl,
           form: data?.form?.name || "",
           team: teamName,
         };
 
-        console.log("Saving player:", playerData);
-
-        const response = await fetch(
-          "https://mahragan-alkraza-ps-default-rtdb.firebaseio.com/players.json",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(playerData),
-          }
-        );
+        const response = await fetch(`${BASE_URL}/players.json`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(playerData),
+        });
 
         if (!response.ok) throw new Error("Failed to save team data");
 
         dispatch(addPlayer(playerData));
-        console.log("Player saved successfully:", player.name);
       }
 
       toast.success("تم حفظ الفريق بالكامل بنجاح 🎉");
       if (onUpdateSelection) {
         onUpdateSelection({
+          gender: null,
           stage: null,
           game: null,
           church: null,
@@ -95,11 +125,9 @@ export default function Team({ data, onUpdateSelection }) {
       setPlayers([]);
       setPlayerCount(1);
     } catch (error) {
-      console.error("Error saving team:", error);
       toast.error("حدث خطأ أثناء حفظ الفريق ❌");
     } finally {
       setLoading(false);
-      console.log("Finished saving team");
     }
   }
 
@@ -109,12 +137,23 @@ export default function Team({ data, onUpdateSelection }) {
       dir="rtl">
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
-          <span className="mb-2 text-blue-700 font-semibold">
-            اسم الفريق{" "}
-            <span className="text-red-600">
-              (يجب أن يكون مميز وليس باسم كنيسة)
-            </span>
-          </span>
+          <div className="mb-2">
+            <span className="text-blue-700 font-semibold">اسم الفريق </span>
+
+            {loadingData ? (
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin"></div>
+            ) : errorData ? (
+              <div className="text-red-500">{errorData}</div>
+            ) : (
+              teamsArr.length > 0 && (
+                <div className="text-gray-500 italic">
+                  الفرق المسجلة مسبقًا: (
+                  <span className="font-bold">{teamsArr.join(", ")}</span>) —
+                  اختر اسمًا جديدًا للفرق.
+                </div>
+              )
+            )}
+          </div>
           <input
             type="text"
             placeholder="اسم الفريق"

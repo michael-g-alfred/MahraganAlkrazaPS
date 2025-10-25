@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import StepHeader from "../components/StepHeader";
-import form from "../data/form";
+import forms from "../data/forms";
 import Header from "../components/Header";
 import SelectCard from "../components/SelectCard";
 import stages from "../data/stages";
+import genders from "../data/genders";
 import games from "../data/games";
 import churches from "../data/churches";
 import Single from "../pages/Single";
@@ -11,6 +12,7 @@ import Team from "../pages/Team";
 
 export default function Home() {
   const [selection, setSelection] = useState({
+    gender: null,
     stage: null,
     game: null,
     church: null,
@@ -21,57 +23,87 @@ export default function Home() {
     <div className="min-h-screen">
       <Header />
       <div className="px-6 pb-12">
-        {/* Step 1: اختر المرحلة */}
+        {/* Step 1: اختر النوع */}
         <div className="mb-12">
-          <StepHeader step={1} title="اختر المرحلة" />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
-            {stages.map((stage, i) => (
+          <StepHeader step={1} title="اختر النوع" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-7xl mx-auto">
+            {genders.map((g, i) => (
               <SelectCard
                 key={i}
-                isSelected={selection.stage === stage}
+                isSelected={selection.gender === g}
                 onClick={() => {
                   setSelection({
-                    stage: stage,
+                    gender: g,
+                    stage: null,
                     game: null,
                     church: null,
                     form: null,
                   });
                 }}>
-                <div>{stage.name}</div>
-                <div className="text-sm text-gray-500">{stage.age}</div>
+                <div>{g.name}</div>
+                <div className="text-sm text-gray-500">{g.age}</div>
               </SelectCard>
             ))}
           </div>
         </div>
 
-        {/* Step 2: اختر اللعبة */}
-        {selection.stage && (
+        {/* Step 2: اختر المرحلة */}
+        {selection.gender && (
           <div className="mb-12">
-            <StepHeader step={2} title="اختر اللعبة" />
+            <StepHeader step={2} title="اختر المرحلة" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
-              {games.map((game, i) => (
+              {stages.map((stage, i) => (
                 <SelectCard
                   key={i}
-                  isSelected={selection.game === game}
+                  isSelected={selection.stage === stage}
                   onClick={() => {
                     setSelection({
                       ...selection,
-                      game: game,
+                      stage: stage,
+                      game: null,
                       church: null,
                       form: null,
                     });
                   }}>
-                  {game.name}
+                  <div>{stage.name}</div>
+                  <div className="text-sm text-gray-500">{stage.age}</div>
                 </SelectCard>
               ))}
             </div>
           </div>
         )}
 
-        {/* Step 3: اختر الكنيسة */}
+        {/* Step 3: اختر اللعبة */}
+        {selection.stage && (
+          <div className="mb-12">
+            <StepHeader step={3} title="اختر اللعبة" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
+              {(selection.stage.name !== "المرحلة الأولى"
+                ? games.filter((g) => g.name !== "جرى تتابع")
+                : games
+              ).map((g, i) => (
+                <SelectCard
+                  key={i}
+                  isSelected={selection.game === g}
+                  onClick={() =>
+                    setSelection({
+                      ...selection,
+                      game: g,
+                      Church: null,
+                      form: null,
+                    })
+                  }>
+                  {g.name}
+                </SelectCard>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: اختر الكنيسة */}
         {selection.game && (
           <div className="mb-12">
-            <StepHeader step={3} title="اختر الكنيسة" />
+            <StepHeader step={4} title="اختر الكنيسة" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
               {churches.map((church, i) => (
                 <SelectCard
@@ -91,18 +123,18 @@ export default function Home() {
           </div>
         )}
 
-        {/* Step 4: اختر نوع الإستمارة */}
+        {/* Step 5: اختر نوع الإستمارة */}
         {selection.church && (
           <div className="mb-12">
-            <StepHeader step={4} title="اختر نوع الإستمارة" />
+            <StepHeader step={5} title="اختر نوع الإستمارة" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-7xl mx-auto">
               {(selection.game &&
               (selection.game.name === "كرة قدم" ||
                 selection.game.name === "كرة الطائرة")
-                ? form.filter((f) => f.name === "جماعى")
+                ? forms.filter((f) => f.name === "جماعى")
                 : selection.game.name === "جرى تتابع"
-                ? form.filter((f) => f.name === "فردى")
-                : form
+                ? forms.filter((f) => f.name === "فردى")
+                : forms
               ).map((f, i) => (
                 <SelectCard
                   key={i}

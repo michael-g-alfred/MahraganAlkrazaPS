@@ -4,6 +4,8 @@ import { addPlayer } from "../redux/features/PlayerSlice";
 import toast from "react-hot-toast";
 import Card from "../components/Card";
 
+const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
+
 export default function Single({ data, onUpdateSelection }) {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
@@ -36,25 +38,23 @@ export default function Single({ data, onUpdateSelection }) {
   async function savePlayer(formDataObj) {
     setLoading(true);
     const player = {
+      image: imageUrl || "",
       name: formDataObj.get("name"),
+      gender: data?.gender?.name || "",
+      stage: data?.stage?.name || "",
+      game: data?.game?.name || "",
+      church: data?.church?.name || "",
       phone: formDataObj.get("phone"),
       birthdate: formDataObj.get("birthdate"),
-      church: data?.church?.name || "",
-      game: data?.game?.name || "",
-      stage: data?.stage?.name || "",
-      image: imageUrl || "",
       form: data?.form?.name || "",
     };
 
     try {
-      const response = await fetch(
-        "https://mahragan-alkraza-ps-default-rtdb.firebaseio.com/players.json",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(player),
-        }
-      );
+      const response = await fetch(`${BASE_URL}/players.json`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(player),
+      });
 
       if (!response.ok) throw new Error("Failed to save player data");
 
@@ -62,6 +62,7 @@ export default function Single({ data, onUpdateSelection }) {
       toast.success("تم حفظ اللاعب بنجاح 🎉");
       if (onUpdateSelection) {
         onUpdateSelection({
+          gender: null,
           stage: null,
           game: null,
           church: null,

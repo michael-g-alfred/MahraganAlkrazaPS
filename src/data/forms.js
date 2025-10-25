@@ -1,4 +1,4 @@
-const form = [
+const forms = [
   {
     name: "فردى",
   },
@@ -7,4 +7,4 @@ const form = [
   },
 ];
 
-export default form;
+export default forms;

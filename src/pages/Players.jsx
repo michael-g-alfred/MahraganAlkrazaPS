@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react";
 import Header from "../components/Header";
 import toast from "react-hot-toast";
 import AlertIcon from "../icons/AlertIcon";
+import TrashIcon from "../icons/TrashIcon";
+import FilterIcon from "../icons/FilterIcon";
+
+const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 
 export default function Players() {
   const [players, setPlayers] = useState([]);
@@ -15,15 +19,20 @@ export default function Players() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const isFilter =
+    filter.gender ||
+    filter.church ||
+    filter.game ||
+    filter.form ||
+    filter.stage ||
+    filter.team;
+
   function handleDeleteItem(player) {
     if (window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) {
       const prevPlayers = [...players];
       setPlayers((prev) => prev.filter((p) => p.id !== player.id));
 
-      fetch(
-        `https://mahragan-alkraza-ps-default-rtdb.firebaseio.com/players/${player.id}.json`,
-        { method: "DELETE" }
-      )
+      fetch(`${BASE_URL}/players/${player.id}.json`, { method: "DELETE" })
         .then((res) => {
           if (!res.ok) throw new Error("فشل في الحذف");
           toast.success("تم حذف اللاعب بنجاح ✅");
@@ -38,10 +47,12 @@ export default function Players() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(
-      "https://mahragan-alkraza-ps-default-rtdb.firebaseio.com/players.json"
-    )
-      .then((res) => res.json())
+
+    fetch(`${BASE_URL}/players.json`)
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        return res.json();
+      })
       .then((data) => {
         if (data) {
           const playersArray = Object.keys(data).map((key) => ({
@@ -57,24 +68,27 @@ export default function Players() {
       })
       .catch(() => {
         setPlayers([]);
-        setError("فشل تحميل البيانات");
+        setError("فشل جلب البيانات من السيرفر");
         setLoading(false);
       });
   }, []);
 
   const filteredPlayers = players.filter((p) => {
-    if (filter.church && p.church !== filter.church) return false;
-    if (filter.game && p.game !== filter.game) return false;
-    if (filter.form && p.form !== filter.form) return false;
+    if (filter.gender && p.gender !== filter.gender) return false;
     if (filter.stage && p.stage !== filter.stage) return false;
+    if (filter.game && p.game !== filter.game) return false;
+    if (filter.church && p.church !== filter.church) return false;
+    if (filter.form && p.form !== filter.form) return false;
     if (filter.team && p.team !== filter.team) return false;
+
     return true;
   });
 
-  const churches = [...new Set(players.map((p) => p.church))];
-  const games = [...new Set(players.map((p) => p.game))];
-  const forms = [...new Set(players.map((p) => p.form))];
+  const genders = [...new Set(players.map((p) => p.gender))];
   const stages = [...new Set(players.map((p) => p.stage))];
+  const games = [...new Set(players.map((p) => p.game))];
+  const churches = [...new Set(players.map((p) => p.church))];
+  const forms = [...new Set(players.map((p) => p.form))];
   const teams = [...new Set(players.map((p) => p.team).filter(Boolean))];
 
   return (
@@ -82,7 +96,7 @@ export default function Players() {
       <Header />
       {loading && (
         <div className="flex justify-center items-center">
-          <div className="w-16 h-16 border-4 border-gray-300 border-t-gray-700 rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-700 rounded-full animate-spin"></div>
         </div>
       )}
       {!loading && error && (
@@ -90,26 +104,27 @@ export default function Players() {
           {error}
         </div>
       )}
+
       {!loading && !error && players.length > 0 && (
         <div className="flex flex-wrap justify-center gap-3 mb-6">
           <select
             className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
-            value={filter.church}
-            onChange={(e) => setFilter({ ...filter, church: e.target.value })}>
-            <option value="">كل الكنائس</option>
-            {churches.map((ch) => (
-              <option key={ch} value={ch}>
-                {ch}
+            value={filter.gender}
+            onChange={(e) => setFilter({ ...filter, gender: e.target.value })}>
+            <option value="">كل الأنواع</option>
+            {genders.map((gn) => (
+              <option key={gn} value={gn}>
+                {gn}
               </option>
             ))}
           </select>
 
           <select
             className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
-            value={filter.form}
-            onChange={(e) => setFilter({ ...filter, form: e.target.value })}>
-            <option value="">كل المسابقات</option>
-            {forms.map((f) => (
+            value={filter.stage}
+            onChange={(e) => setFilter({ ...filter, stage: e.target.value })}>
+            <option value="">كل المراحل</option>
+            {stages.map((f) => (
               <option key={f} value={f}>
                 {f}
               </option>
@@ -130,10 +145,22 @@ export default function Players() {
 
           <select
             className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
-            value={filter.stage}
-            onChange={(e) => setFilter({ ...filter, stage: e.target.value })}>
-            <option value="">كل المراحل</option>
-            {stages.map((f) => (
+            value={filter.church}
+            onChange={(e) => setFilter({ ...filter, church: e.target.value })}>
+            <option value="">كل الكنائس</option>
+            {churches.map((ch) => (
+              <option key={ch} value={ch}>
+                {ch}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
+            value={filter.form}
+            onChange={(e) => setFilter({ ...filter, form: e.target.value })}>
+            <option value="">كل الإستمارات</option>
+            {forms.map((f) => (
               <option key={f} value={f}>
                 {f}
               </option>
@@ -155,29 +182,30 @@ export default function Players() {
           <button
             onClick={() =>
               setFilter({
-                church: "",
-                game: "",
-                form: "",
+                gender: "",
                 stage: "",
+                game: "",
+                church: "",
+                form: "",
                 team: "",
               })
             }
-            className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition">
-            مسح الفلاتر
+            disabled={!isFilter}
+            className={`${
+              isFilter
+                ? "bg-blue-700 hover:bg-blue-800 cursor-pointer"
+                : "bg-gray-300 cursor-not-allowed"
+            } text-white px-4 py-2 rounded-lg transition`}>
+            <FilterIcon />
           </button>
         </div>
       )}
 
       {!loading && !error && players.length > 0 && (
-        <div className="text-center mb-4 space-y-2">
+        <div className="text-center mb-4">
           <p className="text-blue-700 font-bold text-lg">
             عدد اللاعبين: {filteredPlayers.length}
           </p>
-          {teams.length > 0 && (
-            <p className="text-green-700 font-semibold">
-              عدد الفرق المسجلة: {teams.length}
-            </p>
-          )}
         </div>
       )}
 
@@ -190,12 +218,13 @@ export default function Players() {
                 <th className="p-2 sm:p-3 text-center">الصورة</th>
                 <th className="p-2 sm:p-3 text-center">الاسم</th>
 
-                <th className="p-2 sm:p-3 text-center">الكنيسة</th>
-                <th className="p-2 sm:p-3 text-center">المسابقة</th>
-                <th className="p-2 sm:p-3 text-center">اللعبة</th>
+                <th className="p-2 sm:p-3 text-center">النوع</th>
                 <th className="p-2 sm:p-3 text-center">المرحلة</th>
+                <th className="p-2 sm:p-3 text-center">اللعبة</th>
+                <th className="p-2 sm:p-3 text-center">الكنيسة</th>
                 <th className="p-2 sm:p-3 text-center">تاريخ الميلاد</th>
                 <th className="p-2 sm:p-3 text-center">رقم التليفون</th>
+                <th className="p-2 sm:p-3 text-center">الإستمارة</th>
                 <th className="p-2 sm:p-3 text-center bg-green-700">
                   اسم الفريق
                 </th>
@@ -206,28 +235,41 @@ export default function Players() {
               {filteredPlayers.map((player, index) => (
                 <tr
                   key={player.id}
-                  className="border-t border-blue-300 bg-blue-50 hover:bg-blue-100 transition">
-                  <td className="p-2 sm:p-3 text-center font-semibold">
+                  className="border-t border-blue-300 hover:bg-blue-100 transition">
+                  <td className="p-2 sm:p-3 text-center font-semibold bg-blue-50">
                     {index + 1}
                   </td>
-                  <td className="p-2 sm:p-3 flex justify-center items-center text-center">
+                  <td className="p-2 sm:p-3 flex justify-center items-center text-center bg-blue-100">
                     <img
                       src={player.image}
                       alt={player.name}
-                      className="w-16 h-16 object-cover rounded-md border-2 border-blue-700"
+                      className="w-full max-w-[80px] sm:max-w-[100px] md:max-w-[120px] h-auto object-contain rounded-md border-2 border-blue-700"
                     />
                   </td>
-                  <td className="p-2 sm:p-3 font-bold text-center">
+                  <td className="p-2 sm:p-3 font-bold text-center bg-blue-50">
                     {player.name}
                   </td>
 
-                  <td className="p-2 sm:p-3 text-center">{player.church}</td>
-                  <td className="p-2 sm:p-3 text-center">{player.form}</td>
-                  <td className="p-2 sm:p-3 text-center">{player.game}</td>
-                  <td className="p-2 sm:p-3 text-center">{player.stage}</td>
-                  <td className="p-2 sm:p-3 text-center">{player.birthdate}</td>
-                  <td className="p-2 sm:p-3 text-center font-mono">
+                  <td className="p-2 sm:p-3 text-center bg-blue-100">
+                    {player.gender}
+                  </td>
+                  <td className="p-2 sm:p-3 text-center bg-blue-50">
+                    {player.stage}
+                  </td>
+                  <td className="p-2 sm:p-3 text-center bg-blue-100">
+                    {player.game}
+                  </td>
+                  <td className="p-2 sm:p-3 text-center bg-blue-50">
+                    {player.church}
+                  </td>
+                  <td className="p-2 sm:p-3 text-center bg-blue-100">
+                    {player.birthdate}
+                  </td>
+                  <td className="p-2 sm:p-3 text-center font-mono bg-blue-50">
                     {player.phone}
+                  </td>
+                  <td className="p-2 sm:p-3 text-center bg-blue-100">
+                    {player.form}
                   </td>
                   <td className="p-2 sm:p-3 text-center bg-green-50">
                     {player.team ? (
@@ -235,14 +277,14 @@ export default function Players() {
                         {player.team}
                       </span>
                     ) : (
-                      <span className="font-semibold text-green-700">فردي</span>
+                      <hr className="border border-green-700 w-6 mx-auto rounded-full" />
                     )}
                   </td>
-                  <td className="p-2 sm:p-3 text-center">
+                  <td className="p-2 sm:p-3 text-center bg-red-50">
                     <button
                       onClick={() => handleDeleteItem(player)}
-                      className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition">
-                      حذف
+                      className="cursor-pointer">
+                      <TrashIcon size={32} color="red" />
                     </button>
                   </td>
                 </tr>

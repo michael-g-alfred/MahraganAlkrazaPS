@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function Trophy({ size = 50 }) {
+export default function TrophyIcon({ size = 50 }) {
   return (
     <svg
       width={size}
