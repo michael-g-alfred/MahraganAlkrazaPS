@@ -41,8 +41,8 @@ export default function Single({ data, onUpdateSelection }) {
       image: imageUrl || "",
       name: formDataObj.get("name"),
       gender: data?.gender?.name || "",
-      stage: data?.stage?.name || "",
       game: data?.game?.name || "",
+      stage: data?.stage?.name || "",
       church: data?.church?.name || "",
       phone: formDataObj.get("phone"),
       birthdate: formDataObj.get("birthdate"),
@@ -63,8 +63,8 @@ export default function Single({ data, onUpdateSelection }) {
       if (onUpdateSelection) {
         onUpdateSelection({
           gender: null,
-          stage: null,
           game: null,
+          stage: null,
           church: null,
           form: null,
         });
@@ -95,7 +95,7 @@ export default function Single({ data, onUpdateSelection }) {
         disabled={!isFormValid}
         className={`rounded-lg p-4 font-semibold transition ${
           !isFormValid
-            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+            ? "bg-gray-300 text-gray-400 cursor-not-allowed"
             : "bg-blue-700 text-white hover:bg-blue-800"
         }`}>
         {loading ? "جارٍ الحفظ..." : "حفظ اللاعب"}

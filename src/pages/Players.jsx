@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from "react";
-import Header from "../components/Header";
 import toast from "react-hot-toast";
 import AlertIcon from "../icons/AlertIcon";
 import TrashIcon from "../icons/TrashIcon";
 import FilterIcon from "../icons/FilterIcon";
+import Loader from "../components/Loader";
+import useFetch from "../hooks/useFetch";
+import SelectBox from "../components/SelectBox";
 
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 
 export default function Players() {
-  const [players, setPlayers] = useState([]);
+  const [loadingFetch, errorFetch, players] = useFetch();
+  const [localPlayers, setLocalPlayers] = useState([]);
+
+  useEffect(() => {
+    setLocalPlayers(players);
+  }, [players]);
+
   const [filter, setFilter] = useState({
     church: "",
     game: "",
@@ -16,21 +24,19 @@ export default function Players() {
     stage: "",
     team: "",
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   const isFilter =
     filter.gender ||
-    filter.church ||
     filter.game ||
-    filter.form ||
     filter.stage ||
+    filter.church ||
+    filter.form ||
     filter.team;
 
   function handleDeleteItem(player) {
     if (window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) {
-      const prevPlayers = [...players];
-      setPlayers((prev) => prev.filter((p) => p.id !== player.id));
+      const prevPlayers = [...localPlayers];
+      setLocalPlayers((prev) => prev.filter((p) => p.id !== player.id));
 
       fetch(`${BASE_URL}/players/${player.id}.json`, { method: "DELETE" })
         .then((res) => {
@@ -38,45 +44,16 @@ export default function Players() {
           toast.success("تم حذف اللاعب بنجاح ✅");
         })
         .catch(() => {
-          setPlayers(prevPlayers);
+          setLocalPlayers(prevPlayers);
           toast.error("حدث خطأ أثناء الحذف ❌ - تم استرجاع اللاعب");
         });
     }
   }
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-
-    fetch(`${BASE_URL}/players.json`)
-      .then((res) => {
-        if (!res.ok) throw new Error("HTTP error " + res.status);
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
-          const playersArray = Object.keys(data).map((key) => ({
-            id: key,
-            ...data[key],
-          }));
-          setPlayers(playersArray);
-        } else {
-          setPlayers([]);
-        }
-        setLoading(false);
-        setError(null);
-      })
-      .catch(() => {
-        setPlayers([]);
-        setError("فشل جلب البيانات من السيرفر");
-        setLoading(false);
-      });
-  }, []);
-
-  const filteredPlayers = players.filter((p) => {
+  const filteredPlayers = localPlayers.filter((p) => {
     if (filter.gender && p.gender !== filter.gender) return false;
-    if (filter.stage && p.stage !== filter.stage) return false;
     if (filter.game && p.game !== filter.game) return false;
+    if (filter.stage && p.stage !== filter.stage) return false;
     if (filter.church && p.church !== filter.church) return false;
     if (filter.form && p.form !== filter.form) return false;
     if (filter.team && p.team !== filter.team) return false;
@@ -84,107 +61,76 @@ export default function Players() {
     return true;
   });
 
-  const genders = [...new Set(players.map((p) => p.gender))];
-  const stages = [...new Set(players.map((p) => p.stage))];
-  const games = [...new Set(players.map((p) => p.game))];
-  const churches = [...new Set(players.map((p) => p.church))];
-  const forms = [...new Set(players.map((p) => p.form))];
-  const teams = [...new Set(players.map((p) => p.team).filter(Boolean))];
+  const genders = [...new Set(localPlayers.map((p) => p.gender))];
+  const games = [...new Set(localPlayers.map((p) => p.game))];
+  const stages = [...new Set(localPlayers.map((p) => p.stage))];
+  const churches = [...new Set(localPlayers.map((p) => p.church))];
+  const forms = [...new Set(localPlayers.map((p) => p.form))];
+  const teams = [...new Set(localPlayers.map((p) => p.team).filter(Boolean))];
 
   return (
     <div className="min-h-screen">
-      <Header />
-      {loading && (
+      {loadingFetch && (
         <div className="flex justify-center items-center">
-          <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-700 rounded-full animate-spin"></div>
+          <Loader />
         </div>
       )}
-      {!loading && error && (
+      {!loadingFetch && errorFetch && (
         <div className="flex justify-center items-center  text-red-500 text-xl font-semibold">
-          {error}
+          {errorFetch}
         </div>
       )}
 
-      {!loading && !error && players.length > 0 && (
+      {!loadingFetch && !errorFetch && localPlayers.length > 0 && (
         <div className="flex flex-wrap justify-center gap-3 mb-6">
-          <select
-            className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
+          <SelectBox
+            label="كل الأنواع"
             value={filter.gender}
-            onChange={(e) => setFilter({ ...filter, gender: e.target.value })}>
-            <option value="">كل الأنواع</option>
-            {genders.map((gn) => (
-              <option key={gn} value={gn}>
-                {gn}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => setFilter({ ...filter, gender: e.target.value })}
+            options={genders}
+          />
 
-          <select
-            className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
+          <SelectBox
+            label="كل المراحل"
             value={filter.stage}
-            onChange={(e) => setFilter({ ...filter, stage: e.target.value })}>
-            <option value="">كل المراحل</option>
-            {stages.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => setFilter({ ...filter, stage: e.target.value })}
+            options={stages}
+          />
 
-          <select
-            className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
+          <SelectBox
+            label="كل الألعاب"
             value={filter.game}
-            onChange={(e) => setFilter({ ...filter, game: e.target.value })}>
-            <option value="">كل الألعاب</option>
-            {games.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => setFilter({ ...filter, game: e.target.value })}
+            options={games}
+          />
 
-          <select
-            className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
+          <SelectBox
+            label="كل الكنائس"
             value={filter.church}
-            onChange={(e) => setFilter({ ...filter, church: e.target.value })}>
-            <option value="">كل الكنائس</option>
-            {churches.map((ch) => (
-              <option key={ch} value={ch}>
-                {ch}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => setFilter({ ...filter, church: e.target.value })}
+            options={churches}
+          />
 
-          <select
-            className="border border-blue-700 rounded-lg p-2 text-blue-700 bg-blue-50"
+          <SelectBox
+            label="كل الإستمارات"
             value={filter.form}
-            onChange={(e) => setFilter({ ...filter, form: e.target.value })}>
-            <option value="">كل الإستمارات</option>
-            {forms.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => setFilter({ ...filter, form: e.target.value })}
+            options={forms}
+          />
 
-          <select
-            className="border border-green-700 rounded-lg p-2 text-green-700 bg-green-50"
+          <SelectBox
+            label="كل الفرق"
             value={filter.team}
-            onChange={(e) => setFilter({ ...filter, team: e.target.value })}>
-            <option value="">كل الفرق</option>
-            {teams.map((team) => (
-              <option key={team} value={team}>
-                {team}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => setFilter({ ...filter, team: e.target.value })}
+            options={teams}
+          />
 
           <button
             onClick={() =>
               setFilter({
                 gender: "",
-                stage: "",
                 game: "",
+                stage: "",
                 church: "",
                 form: "",
                 team: "",
@@ -193,15 +139,15 @@ export default function Players() {
             disabled={!isFilter}
             className={`${
               isFilter
-                ? "bg-blue-700 hover:bg-blue-800 cursor-pointer"
-                : "bg-gray-300 cursor-not-allowed"
-            } text-white px-4 py-2 rounded-lg transition`}>
+                ? "bg-blue-700 hover:bg-blue-800 text-white cursor-pointer"
+                : "bg-gray-300 cursor-not-allowed text-gray-400"
+            } px-4 py-2 rounded-lg transition`}>
             <FilterIcon />
           </button>
         </div>
       )}
 
-      {!loading && !error && players.length > 0 && (
+      {!loadingFetch && !errorFetch && localPlayers.length > 0 && (
         <div className="text-center mb-4">
           <p className="text-blue-700 font-bold text-lg">
             عدد اللاعبين: {filteredPlayers.length}
@@ -209,8 +155,8 @@ export default function Players() {
         </div>
       )}
 
-      {!loading && !error && filteredPlayers.length > 0 && (
-        <div className="overflow-x-auto max-w-7xl mx-auto shadow-sm rounded-xl">
+      {!loadingFetch && !errorFetch && filteredPlayers.length > 0 && (
+        <div className="overflow-x-auto mx-auto shadow-sm rounded-xl">
           <table className="min-w-full rounded-xl overflow-hidden text-xs sm:text-sm md:text-base w-full">
             <thead className="bg-blue-700 text-white text-sm">
               <tr>
@@ -219,8 +165,8 @@ export default function Players() {
                 <th className="p-2 sm:p-3 text-center">الاسم</th>
 
                 <th className="p-2 sm:p-3 text-center">النوع</th>
-                <th className="p-2 sm:p-3 text-center">المرحلة</th>
                 <th className="p-2 sm:p-3 text-center">اللعبة</th>
+                <th className="p-2 sm:p-3 text-center">المرحلة</th>
                 <th className="p-2 sm:p-3 text-center">الكنيسة</th>
                 <th className="p-2 sm:p-3 text-center">تاريخ الميلاد</th>
                 <th className="p-2 sm:p-3 text-center">رقم التليفون</th>
@@ -254,10 +200,10 @@ export default function Players() {
                     {player.gender}
                   </td>
                   <td className="p-2 sm:p-3 text-center bg-blue-50">
-                    {player.stage}
+                    {player.game}
                   </td>
                   <td className="p-2 sm:p-3 text-center bg-blue-100">
-                    {player.game}
+                    {player.stage}
                   </td>
                   <td className="p-2 sm:p-3 text-center bg-blue-50">
                     {player.church}
@@ -293,7 +239,7 @@ export default function Players() {
           </table>
         </div>
       )}
-      {!loading && !error && players.length === 0 && (
+      {!loadingFetch && !errorFetch && localPlayers.length === 0 && (
         <div className="flex flex-col justify-center items-center gap-2 text-center">
           <p className="text-gray-500">
             <AlertIcon />

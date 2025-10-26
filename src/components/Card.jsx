@@ -15,8 +15,9 @@ export default function Card({
           label="اسم اللاعب"
           type="text"
           name="name"
-          placeholder="اكتب الاسم رباعي"
+          placeholder="اكتب الاسم رباعي (حروف عربية فقط)"
           required
+          pattern="^[\u0600-\u06FF\s]+$"
           value={formData.name}
           onChange={handleInputChange}
         />

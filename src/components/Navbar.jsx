@@ -24,6 +24,7 @@ export default function Navbar() {
       {[
         { to: "/", label: "الرئيسية", end: true },
         { to: "players", label: "اللاعبين" },
+        { to: "maps", label: "الخريطة" },
       ].map(({ to, label, end }) => (
         <NavLink
           key={to}

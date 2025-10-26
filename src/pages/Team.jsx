@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import React, { useState } from "react";
+import { useDispatch } from "react-redux";
 import { addPlayer } from "../redux/features/PlayerSlice";
 import toast from "react-hot-toast";
 import Card from "../components/Card";
+import Loader from "../components/Loader";
+import useFetch from "../hooks/useFetch";
 
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 
@@ -13,41 +15,9 @@ export default function Team({ data, onUpdateSelection }) {
   const [playerCount, setPlayerCount] = useState("");
   const [players, setPlayers] = useState([]);
 
-  const [teamsData, setTeamsData] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [errorData, setErrorData] = useState(null);
+  const [loadingFetch, errorFetch, playersData] = useFetch();
 
-  const teamsArr = [...new Set(teamsData.map((t) => t.team).filter(Boolean))];
-
-  useEffect(() => {
-    setLoadingData(true);
-    setErrorData(null);
-
-    const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
-    fetch(`${BASE_URL}/players.json`)
-      .then((res) => {
-        if (!res.ok) throw new Error("HTTP error " + res.status);
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
-          const playersArray = Object.keys(data).map((key) => ({
-            id: key,
-            ...data[key],
-          }));
-          setTeamsData(playersArray);
-        } else {
-          setTeamsData([]);
-        }
-        setLoadingData(false);
-        setErrorData(null);
-      })
-      .catch(() => {
-        setTeamsData([]);
-        setErrorData("فشل تحميل أسماء الفرق المسجلة");
-        setLoadingData(false);
-      });
-  }, []);
+  const teamsArr = [...new Set(playersData.map((t) => t.team).filter(Boolean))];
 
   // إنشاء الفورمات الفارغة بعد تحديد العدد
   const handleGeneratePlayers = () => {
@@ -91,8 +61,8 @@ export default function Team({ data, onUpdateSelection }) {
           name: player.name,
           image: player.imageUrl || "",
           gender: data?.gender?.name || "",
-          stage: data?.stage?.name || "",
           game: data?.game?.name || "",
+          stage: data?.stage?.name || "",
           church: data?.church?.name || "",
           phone: player.phone,
           birthdate: player.birthdate,
@@ -115,8 +85,8 @@ export default function Team({ data, onUpdateSelection }) {
       if (onUpdateSelection) {
         onUpdateSelection({
           gender: null,
-          stage: null,
           game: null,
+          stage: null,
           church: null,
           form: null,
         });
@@ -140,12 +110,12 @@ export default function Team({ data, onUpdateSelection }) {
           <div className="mb-2">
             <span className="text-blue-700 font-semibold">اسم الفريق </span>
 
-            {loadingData ? (
-              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin"></div>
-            ) : errorData ? (
-              <div className="text-red-500">{errorData}</div>
+            {loadingFetch ? (
+              <Loader size={4} />
+            ) : errorFetch ? (
+              <div className="text-red-500">{errorFetch}</div>
             ) : (
-              teamsArr.length > 0 && (
+              playersData.length > 0 && (
                 <div className="text-gray-500 italic">
                   الفرق المسجلة مسبقًا: (
                   <span className="font-bold">{teamsArr.join(", ")}</span>) —
@@ -178,7 +148,7 @@ export default function Team({ data, onUpdateSelection }) {
           disabled={!teamName || playerCount < 1}
           className={`p-3 rounded-lg font-semibold transition ${
             !teamName || playerCount < 1
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-gray-300 text-gray-400 cursor-not-allowed"
               : "bg-blue-700 text-white hover:bg-blue-800"
           }`}>
           تسجيل اللاعبين
@@ -210,7 +180,7 @@ export default function Team({ data, onUpdateSelection }) {
           disabled={!isTeamValid}
           className={`rounded-lg p-4 font-semibold transition ${
             !isTeamValid
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-gray-300 text-gray-400 cursor-not-allowed"
               : "bg-blue-700 text-white hover:bg-blue-800"
           }`}>
           {loading ? "جارٍ الحفظ..." : "حفظ الفريق"}

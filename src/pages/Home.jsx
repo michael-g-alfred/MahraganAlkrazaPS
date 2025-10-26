@@ -13,8 +13,8 @@ import Team from "../pages/Team";
 export default function Home() {
   const [selection, setSelection] = useState({
     gender: null,
-    stage: null,
     game: null,
+    stage: null,
     church: null,
     form: null,
   });
@@ -47,41 +47,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Step 2: اختر المرحلة */}
+        {/* Step 2: اختر اللعبة */}
         {selection.gender && (
           <div className="mb-12">
-            <StepHeader step={2} title="اختر المرحلة" />
+            <StepHeader step={2} title="اختر اللعبة" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
-              {stages.map((stage, i) => (
-                <SelectCard
-                  key={i}
-                  isSelected={selection.stage === stage}
-                  onClick={() => {
-                    setSelection({
-                      ...selection,
-                      stage: stage,
-                      game: null,
-                      church: null,
-                      form: null,
-                    });
-                  }}>
-                  <div>{stage.name}</div>
-                  <div className="text-sm text-gray-500">{stage.age}</div>
-                </SelectCard>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: اختر اللعبة */}
-        {selection.stage && (
-          <div className="mb-12">
-            <StepHeader step={3} title="اختر اللعبة" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
-              {(selection.stage.name !== "المرحلة الأولى"
-                ? games.filter((g) => g.name !== "جرى تتابع")
-                : games
-              ).map((g, i) => (
+              {games.map((g, i) => (
                 <SelectCard
                   key={i}
                   isSelected={selection.game === g}
@@ -89,7 +60,8 @@ export default function Home() {
                     setSelection({
                       ...selection,
                       game: g,
-                      Church: null,
+                      stage: null,
+                      church: null,
                       form: null,
                     })
                   }>
@@ -100,8 +72,41 @@ export default function Home() {
           </div>
         )}
 
-        {/* Step 4: اختر الكنيسة */}
+        {/* Step 3: اختر المرحلة */}
         {selection.game && (
+          <div className="mb-12">
+            <StepHeader step={3} title="اختر المرحلة" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
+              {stages
+                .filter((stage) =>
+                  selection.game.name === "جرى تتابع"
+                    ? stage.name === "المرحلة الأولى (أ)" ||
+                      stage.name === "المرحلة الأولى (ب)"
+                    : stage.name !== "المرحلة الأولى (أ)" &&
+                      stage.name !== "المرحلة الأولى (ب)"
+                )
+                .map((stage, i) => (
+                  <SelectCard
+                    key={i}
+                    isSelected={selection.stage === stage}
+                    onClick={() => {
+                      setSelection({
+                        ...selection,
+                        stage: stage,
+                        church: null,
+                        form: null,
+                      });
+                    }}>
+                    <div>{stage.name}</div>
+                    <div className="text-sm text-gray-500">{stage.age}</div>
+                  </SelectCard>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: اختر الكنيسة */}
+        {selection.stage && (
           <div className="mb-12">
             <StepHeader step={4} title="اختر الكنيسة" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">

@@ -8,6 +8,7 @@ import { Provider } from "react-redux";
 import { store } from "../redux/app/store";
 import Players from "../pages/Players";
 import { Toaster } from "react-hot-toast";
+import Maps from "../pages/Maps";
 
 function RootLayout() {
   return (
@@ -34,6 +35,10 @@ const router = createBrowserRouter([
       {
         path: "players",
         element: <Players />,
+      },
+      {
+        path: "maps",
+        element: <Maps />,
       },
     ],
   },
