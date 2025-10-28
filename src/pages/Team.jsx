@@ -119,35 +119,46 @@ export default function Team({ data, onUpdateSelection }) {
                 <div className="text-gray-500 italic">
                   الفرق المسجلة مسبقًا: (
                   <span className="font-bold">{teamsArr.join(", ")}</span>) —
-                  اختر اسمًا جديدًا للفرق.
+                  اختر اسمًا جديدًا لا يكون اسم كنيسة.
                 </div>
               )
             )}
           </div>
           <input
             type="text"
-            placeholder="اسم الفريق"
+            placeholder="لا يكون اسم كنيسة - مثال: المحبة"
             value={teamName}
             onChange={(e) => setTeamName(e.target.value)}
             className="border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-700"
           />
         </label>
 
-        <input
-          type="number"
-          min="1"
-          max="12"
-          placeholder="عدد اللاعبين"
-          value={playerCount}
-          onChange={(e) => setPlayerCount(Number(e.target.value))}
-          className="border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-700"
-        />
+        <label className="flex flex-col gap-2" dir="rtl">
+          <div className="mb-2 text-blue-700 font-semibold">
+            عدد اللاعبين بالفريق
+          </div>
+          <input
+            type="number"
+            min="2"
+            max="12"
+            pattern=""
+            placeholder="عدد اللاعبين بالفريق (٢: ١٢) بالإنجليزية"
+            value={playerCount}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (/^[1-9]*$/.test(value)) {
+                setPlayerCount(value);
+              }
+            }}
+            className="border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-700"
+          />
+        </label>
 
         <button
           onClick={handleGeneratePlayers}
-          disabled={!teamName || playerCount < 1}
+          disabled={!teamName || playerCount < 2}
           className={`p-3 rounded-lg font-semibold transition ${
-            !teamName || playerCount < 1
+            !teamName || playerCount < 2
               ? "bg-gray-300 text-gray-400 cursor-not-allowed"
               : "bg-blue-700 text-white hover:bg-blue-800"
           }`}>

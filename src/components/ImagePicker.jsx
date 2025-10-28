@@ -5,7 +5,6 @@ import uploadImageToCloudinary from "../utils/cloudinary";
 export default function ImagePicker({ required, onImageSelect }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [error, setError] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -87,24 +86,6 @@ export default function ImagePicker({ required, onImageSelect }) {
     }
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    handleFileSelect(file);
-  };
-
   const handleClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -126,17 +107,10 @@ export default function ImagePicker({ required, onImageSelect }) {
       {!imageUrl ? (
         <button
           type="button"
-          className={`w-64 h-64 border-2 border-dashed rounded-xl cursor-pointer flex flex-col items-center justify-center gap-4 transition-colors duration-200 ${
-            isDragging
-              ? "border-blue-700 bg-blue-50"
-              : "border-gray-300 hover:border-blue-700 hover:bg-blue-50"
-          }`}
+          className={`group w-64 h-64 border-2 border-dashed rounded-xl cursor-pointer flex flex-col items-center justify-center gap-4 transition-colors duration-200 border-gray-300 hover:border-blue-700 hover:bg-blue-50`}
           onClick={handleClick}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
           disabled={isUploading}>
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center">
             {isUploading ? (
               <div className="flex flex-col items-center gap-2 text-blue-700">
                 <svg
@@ -156,25 +130,27 @@ export default function ImagePicker({ required, onImageSelect }) {
                     fill="currentColor"
                     d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                 </svg>
-                <p className="text-lg font-medium">جاري الرفع...</p>
+                <p className="text-lg font-medium" dir="rtl">
+                  جاري الرفع...
+                </p>
               </div>
-            ) : isDragging ? (
-              <Upload className="w-12 h-12 text-blue-700" />
             ) : (
-              <FileImage className="w-12 h-12 text-gray-400" />
+              <FileImage className="w-12 h-12 text-gray-400 group-hover:text-blue-700 mb-4" />
             )}
             {!isUploading && (
               <>
-                <div className="text-center">
-                  <p className="text-lg font-medium text-gray-700">
-                    {isDragging ? "أسقط صورتك هنا" : "اختر صورة"}
+                <div className="text-center flex flex-col items-center gap-1">
+                  <p className="text-sm font-bold text-gray-700 px-4 group-hover:text-blue-700">
+                    اختر صورة البطاقة أو شهادة الميلاد
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    اضغط للاختيار أو اسحب وأفلت
-                  </p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    يدعم: JPEG, PNG, GIF, WebP (بحد أقصى 10MB)
-                  </p>
+                  <div className="flex flex-col items-center">
+                    <p className="text-xs text-gray-400 mt-2 group-hover:text-blue-700">
+                      يدعم: JPEG, PNG, GIF, WebP
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2 group-hover:text-blue-700">
+                      (بحد أقصى 10MB)
+                    </p>
+                  </div>
                 </div>
               </>
             )}
