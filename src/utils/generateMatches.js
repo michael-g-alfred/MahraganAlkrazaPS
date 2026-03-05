@@ -6,28 +6,34 @@ function shuffleArray(array) {
   }
   return arr;
 }
-function generateMatches(playersOrTeams) {
-  const shuffled = shuffleArray(playersOrTeams);
+
+/**
+ * @param {Array} items - array of players or teams
+ * @param {boolean} isTeam - if true, deduplicate by team name first
+ */
+function generateMatches(items, isTeam = false) {
+  // لو فرق → نشيل المكرر ونخلي كل فريق مرة واحدة بس
+  const unique = isTeam
+    ? [...new Map(items.map((p) => [p.team, p])).values()]
+    : items;
+
+  const shuffled = shuffleArray(unique);
   const matches = [];
+
   for (let i = 0; i < shuffled.length; i += 2) {
-    const team1 = shuffled[i];
-    const team2 = shuffled[i + 1];
-    if (team2) {
-      matches.push(
-        `${
-          team1.name?.name || team1.name || team1.team?.name || team1.team
-        } 🆚 ${
-          team2.name?.name || team2.name || team2.team?.name || team2.team
-        }`
-      );
+    const a = shuffled[i];
+    const b = shuffled[i + 1];
+
+    // اسم العنصر: لو فريق نأخذ team، لو فردي نأخذ name
+    const nameOf = (x) => (isTeam ? x.team : x.name) || "؟";
+
+    if (b) {
+      matches.push(`${nameOf(a)} 🆚 ${nameOf(b)}`);
     } else {
-      matches.push(
-        `${
-          team1.name?.name || team1.name || team1.team?.name || team1.team
-        } 🏅 تأهل تلقائيًا`
-      );
+      matches.push(`${nameOf(a)} 🏅 تأهل تلقائيًا`);
     }
   }
+
   return matches;
 }
 
