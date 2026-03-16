@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import usePlayerSave from "../hooks/usePlayerSave";
 import Card from "../components/Card";
 import Loader from "../components/Loader";
@@ -19,6 +19,11 @@ export default function Team({ data, onUpdateSelection }) {
 
   const parsedCount = parseInt(playerCount, 10);
   const countIsValid = !isNaN(parsedCount) && parsedCount >= 2 && parsedCount <= 12;
+
+  // ✅ Reset players array when playerCount changes
+  useEffect(() => {
+    setPlayers([]);
+  }, [playerCount]);
 
   const handleGeneratePlayers = () => {
     const newPlayers = Array.from({ length: parsedCount }, () => ({

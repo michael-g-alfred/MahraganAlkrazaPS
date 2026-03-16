@@ -8,13 +8,34 @@ const uploadImageToCloudinary = async (file) => {
   data.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
   data.append("cloud_name", CLOUDINARY_CLOUD_NAME);
 
-  const res = await fetch(CLOUDINARY_URL, {
-    method: "POST",
-    body: data,
-  });
+  try {
+    const res = await fetch(CLOUDINARY_URL, {
+      method: "POST",
+      body: data,
+    });
 
-  const uploaded = await res.json();
-  return uploaded.secure_url;
+    if (!res.ok) {
+      console.error("Cloudinary HTTP error:", res.status, res.statusText);
+      return null;
+    }
+
+    const uploaded = await res.json();
+
+    if (uploaded.error) {
+      console.error("Cloudinary API error:", uploaded.error.message);
+      return null;
+    }
+
+    if (!uploaded.secure_url) {
+      console.error("Cloudinary: no secure_url in response", uploaded);
+      return null;
+    }
+
+    return uploaded.secure_url;
+  } catch (err) {
+    console.error("Cloudinary upload failed:", err);
+    return null;
+  }
 };
 
 export default uploadImageToCloudinary;

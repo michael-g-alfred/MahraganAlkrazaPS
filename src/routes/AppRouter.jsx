@@ -1,5 +1,10 @@
 import React from "react";
-import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Outlet,
+  Navigate,
+} from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Error from "../pages/Error";
@@ -8,7 +13,10 @@ import { Provider } from "react-redux";
 import { store } from "../redux/app/store";
 import Players from "../pages/Players";
 import { Toaster } from "react-hot-toast";
-import Maps from "../pages/Maps";
+import Login from "../pages/Login";
+import Admin from "../pages/Admin";
+import { useAuth } from "../context/AuthContext";
+import Loader from "../components/Loader";
 
 function RootLayout() {
   return (
@@ -23,22 +31,41 @@ function RootLayout() {
   );
 }
 
+function RequireAuth({ children }) {
+  const { user, loadingAuth } = useAuth();
+  if (loadingAuth) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader size={10} />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
     element: <RootLayout />,
     children: [
-      {
-        index: "true",
-        element: <Home />,
-      },
+      { index: true, element: <Home /> },
+      { path: "login", element: <Login /> },
       {
         path: "players",
-        element: <Players />,
+        element: (
+          <RequireAuth>
+            <Players />
+          </RequireAuth>
+        ),
       },
       {
-        path: "maps",
-        element: <Maps />,
+        path: "admin",
+        element: (
+          <RequireAuth>
+            <Admin />
+          </RequireAuth>
+        ),
       },
     ],
   },
