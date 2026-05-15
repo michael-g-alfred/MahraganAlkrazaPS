@@ -3,12 +3,17 @@ import usePlayerSave from "../hooks/usePlayerSave";
 import Card from "../components/Card";
 import Loader from "../components/Loader";
 import useFetch from "../hooks/useFetch";
+import { validateBirthdate, validateNameUnique } from "../utils/validatePlayer";
 
 export default function Team({ data, onUpdateSelection }) {
   const { loading, saveTeam } = usePlayerSave(data, onUpdateSelection);
   const [teamName, setTeamName] = useState("");
   const [playerCount, setPlayerCount] = useState("");
   const [players, setPlayers] = useState([]);
+
+  // أخطاء: مصفوفة بنفس طول players
+  const [playerErrors, setPlayerErrors] = useState([]);
+  const [checkingNames, setCheckingNames] = useState([]);
 
   const [loadingFetch, errorFetch, playersData] = useFetch();
 
@@ -20,9 +25,11 @@ export default function Team({ data, onUpdateSelection }) {
   const parsedCount = parseInt(playerCount, 10);
   const countIsValid = !isNaN(parsedCount) && parsedCount >= 2 && parsedCount <= 12;
 
-  // ✅ Reset players array when playerCount changes
+  // Reset كل حاجة لما يتغير عدد اللاعبين
   useEffect(() => {
     setPlayers([]);
+    setPlayerErrors([]);
+    setCheckingNames([]);
   }, [playerCount]);
 
   const handleGeneratePlayers = () => {
@@ -33,12 +40,41 @@ export default function Team({ data, onUpdateSelection }) {
       imageUrl: null,
     }));
     setPlayers(newPlayers);
+    setPlayerErrors(Array(parsedCount).fill({ birthdate: null, name: null }));
+    setCheckingNames(Array(parsedCount).fill(false));
   };
 
   const handlePlayerChange = (index, field, value) => {
     setPlayers((prev) =>
       prev.map((player, i) => (i === index ? { ...player, [field]: value } : player))
     );
+
+    // تحقق من تاريخ الميلاد فور تغييره
+    if (field === "birthdate" && data?.stage?.name) {
+      const error = validateBirthdate(value, data.stage.name);
+      setPlayerErrors((prev) =>
+        prev.map((e, i) => (i === index ? { ...e, birthdate: error } : e))
+      );
+    }
+
+    // تحقق من الاسم بـ debounce
+    if (field === "name") {
+      setCheckingNames((prev) =>
+        prev.map((c, i) => (i === index ? true : c))
+      );
+
+      // نلغي الـ timeout القديم عن طريق key فريد لكل لاعب
+      clearTimeout(window[`nameTimer_${index}`]);
+      window[`nameTimer_${index}`] = setTimeout(async () => {
+        const error = await validateNameUnique(value, data);
+        setPlayerErrors((prev) =>
+          prev.map((e, i) => (i === index ? { ...e, name: error } : e))
+        );
+        setCheckingNames((prev) =>
+          prev.map((c, i) => (i === index ? false : c))
+        );
+      }, 600);
+    }
   };
 
   const handleImageChange = (index, url) => {
@@ -47,18 +83,37 @@ export default function Team({ data, onUpdateSelection }) {
     );
   };
 
+  const hasAnyError =
+    playerErrors.some((e) => e?.birthdate || e?.name) ||
+    checkingNames.some(Boolean);
+
   const isTeamValid =
     teamName.trim() &&
     !teamsArr.includes(teamName.trim()) &&
     players.length >= 2 &&
     players.every((p) => p.name?.trim() && p.phone?.trim() && p.birthdate && p.imageUrl) &&
+    !hasAnyError &&
     !loading;
 
   const handleSave = async () => {
+    // تحقق نهائي قبل الحفظ
+    const finalErrors = await Promise.all(
+      players.map(async (p) => ({
+        birthdate: validateBirthdate(p.birthdate, data?.stage?.name),
+        name: await validateNameUnique(p.name, data),
+      }))
+    );
+    setPlayerErrors(finalErrors);
+
+    const hasError = finalErrors.some((e) => e.birthdate || e.name);
+    if (hasError) return;
+
     await saveTeam(players, teamName.trim());
     setTeamName("");
     setPlayers([]);
     setPlayerCount("");
+    setPlayerErrors([]);
+    setCheckingNames([]);
   };
 
   return (
@@ -154,6 +209,26 @@ export default function Team({ data, onUpdateSelection }) {
                 }
                 handleImageChange={(url) => handleImageChange(index, url)}
               />
+
+              {/* أخطاء اللاعب */}
+              {playerErrors[index]?.name && (
+                <div role="alert" className="mt-2 flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3">
+                  <span>⚠️</span>
+                  <span>{playerErrors[index].name}</span>
+                </div>
+              )}
+              {checkingNames[index] && (
+                <p className="mt-1 text-blue-500 text-sm text-center animate-pulse">
+                  جارٍ التحقق من الاسم...
+                </p>
+              )}
+              {playerErrors[index]?.birthdate && (
+                <div role="alert" className="mt-2 flex items-center gap-2 bg-orange-50 border border-orange-300 text-orange-700 text-sm rounded-xl px-4 py-3">
+                  <span>📅</span>
+                  <span>{playerErrors[index].birthdate}</span>
+                </div>
+              )}
+
               {index < players.length - 1 && (
                 <hr className="mt-4 border-t-2 border-gray-500" />
               )}
