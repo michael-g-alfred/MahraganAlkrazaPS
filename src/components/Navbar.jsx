@@ -2,11 +2,8 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const ALLOWED_EMAIL = "michoolgeorge@gmail.com";
-
 export default function Navbar() {
   const { user } = useAuth();
-  const isSuperAdmin = user?.email?.toLowerCase() === ALLOWED_EMAIL;
 
   return (
     <nav
@@ -26,17 +23,15 @@ export default function Navbar() {
 
       {user && (
         <>
-          {isSuperAdmin && (
-            <NavLink
-              to="/players"
-              className={({ isActive }) =>
-                isActive ?
-                  "text-blue-700 font-semibold"
-                : "text-gray-500 hover:text-blue-500 transition-colors duration-200"
-              }>
-              اللاعبين
-            </NavLink>
-          )}
+          <NavLink
+            to="/players"
+            className={({ isActive }) =>
+              isActive ?
+                "text-blue-700 font-semibold"
+              : "text-gray-500 hover:text-blue-500 transition-colors duration-200"
+            }>
+            اللاعبين
+          </NavLink>
           <NavLink
             to="/admin"
             className={({ isActive }) =>

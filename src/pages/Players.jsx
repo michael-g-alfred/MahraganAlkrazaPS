@@ -10,9 +10,12 @@ import { useAuth } from "../context/AuthContext";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
+const ALLOWED_DELETE_ALL_EMAIL = "michoolgeorge@gmail.com";
 
 export default function Players() {
   const { user } = useAuth();
+  const canDeleteAll =
+    user?.email?.toLowerCase() === ALLOWED_DELETE_ALL_EMAIL;
 
   const [loadingFetch, errorFetch, players] = useFetch();
   const [localPlayers, setLocalPlayers] = useState([]);
@@ -189,21 +192,23 @@ export default function Players() {
             تحميل Excel
           </button>
 
-          {/* مسح الكل */}
-          <button
-            onClick={handleDeleteAll}
-            disabled={deletingAll || localPlayers.length === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
-              deletingAll || localPlayers.length === 0 ? "bg-gray-300 text-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-            }`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6M14 11v6" />
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-            </svg>
-            {deletingAll ? "جاري الحذف..." : "مسح الكل"}
-          </button>
+          {/* مسح الكل — فقط لـ michoolgeorge@gmail.com */}
+          {canDeleteAll && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={deletingAll || localPlayers.length === 0}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
+                deletingAll || localPlayers.length === 0 ? "bg-gray-300 text-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+              }`}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+              {deletingAll ? "جاري الحذف..." : "مسح الكل"}
+            </button>
+          )}
         </div>
       )}
 
@@ -223,7 +228,9 @@ export default function Players() {
                 <th scope="col" className="p-2 sm:p-3 text-center">رقم التليفون</th>
                 <th scope="col" className="p-2 sm:p-3 text-center">الإستمارة</th>
                 <th scope="col" className="p-2 sm:p-3 text-center bg-green-700">اسم الفريق</th>
-                <th scope="col" className="p-2 sm:p-3 text-center bg-red-700">إجراءات</th>
+                {canDeleteAll && (
+                  <th scope="col" className="p-2 sm:p-3 text-center bg-red-700">إجراءات</th>
+                )}
               </tr>
             </thead>
             <tbody className="text-blue-700 bg-white text-sm">
@@ -255,11 +262,13 @@ export default function Players() {
                       <hr className="border border-green-700 w-6 mx-auto rounded-full" />
                     )}
                   </td>
-                  <td className="p-2 sm:p-3 text-center bg-red-50">
-                    <button onClick={() => handleDeleteItem(player)} aria-label={`حذف اللاعب ${player.name}`} className="cursor-pointer">
-                      <TrashIcon size={32} color="red" />
-                    </button>
-                  </td>
+                  {canDeleteAll && (
+                    <td className="p-2 sm:p-3 text-center bg-red-50">
+                      <button onClick={() => handleDeleteItem(player)} aria-label={`حذف اللاعب ${player.name}`} className="cursor-pointer">
+                        <TrashIcon size={32} color="red" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
