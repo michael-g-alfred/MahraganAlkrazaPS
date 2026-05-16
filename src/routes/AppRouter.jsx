@@ -18,6 +18,8 @@ import Admin from "../pages/Admin";
 import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 
+const ALLOWED_EMAIL = "michoolgeorge@gmail.com";
+
 function RootLayout() {
   return (
     <div className="flex flex-col min-h-screen" dir="rtl">
@@ -44,6 +46,20 @@ function RequireAuth({ children }) {
   return children;
 }
 
+function RequireSuperAdmin({ children }) {
+  const { user, loadingAuth } = useAuth();
+  if (loadingAuth) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader size={10} />
+      </div>
+    );
+  }
+  if (!user || user.email?.toLowerCase() !== ALLOWED_EMAIL)
+    return <Navigate to="/" replace />;
+  return children;
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -54,9 +70,9 @@ const router = createBrowserRouter([
       {
         path: "players",
         element: (
-          <RequireAuth>
+          <RequireSuperAdmin>
             <Players />
-          </RequireAuth>
+          </RequireSuperAdmin>
         ),
       },
       {
