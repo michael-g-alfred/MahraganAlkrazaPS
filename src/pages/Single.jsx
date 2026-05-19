@@ -6,19 +6,22 @@ import { validateBirthdate, validateNameUnique } from "../utils/validatePlayer";
 export default function Single({ data, onUpdateSelection }) {
   const { loading, savePlayer } = usePlayerSave(data, onUpdateSelection);
 
-  const [formData, setFormData] = useState({ name: "", phone: "", birthdate: "" });
-  const [imageUrl, setImageUrl] = useState(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    phone: "",
+    birthdate: "",
+    nationalId: "",
+  });
 
-  // أخطاء الـ validation
   const [birthdateError, setBirthdateError] = useState(null);
   const [nameError, setNameError] = useState(null);
   const [checkingName, setCheckingName] = useState(false);
+  const [nationalIdValid, setNationalIdValid] = useState(false); // ← جديد
 
-  // ── التحقق من تاريخ الميلاد فور تغييره ──
+  // ── التحقق من تاريخ الميلاد ──
   useEffect(() => {
     if (formData.birthdate && data?.stage?.name) {
-      const error = validateBirthdate(formData.birthdate, data.stage.name);
-      setBirthdateError(error);
+      setBirthdateError(validateBirthdate(formData.birthdate, data.stage.name));
     } else {
       setBirthdateError(null);
     }
@@ -30,14 +33,11 @@ export default function Single({ data, onUpdateSelection }) {
       setNameError(null);
       return;
     }
-
     const timer = setTimeout(async () => {
       setCheckingName(true);
-      const error = await validateNameUnique(formData.name, data);
-      setNameError(error);
+      setNameError(await validateNameUnique(formData.name, data));
       setCheckingName(false);
     }, 600);
-
     return () => clearTimeout(timer);
   }, [formData.name, data]);
 
@@ -46,37 +46,38 @@ export default function Single({ data, onUpdateSelection }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const hasErrors = !!birthdateError || !!nameError || checkingName;
+  const handleNationalIdChange = (val) => {
+    setFormData((prev) => ({ ...prev, nationalId: val }));
+  };
 
   const isFormValid =
     formData.name.trim() &&
     formData.phone.trim() &&
     formData.birthdate &&
-    imageUrl &&
-    !hasErrors &&
+    !birthdateError &&
+    !nameError &&
+    !checkingName &&
+    nationalIdValid &&   // ← الرقم القومى مكتمل + مش متكرر + مش بيتحقق
     !loading;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // تحقق نهائي قبل الحفظ
     const bdError = validateBirthdate(formData.birthdate, data?.stage?.name);
-    if (bdError) {
-      setBirthdateError(bdError);
-      return;
-    }
+    if (bdError) { setBirthdateError(bdError); return; }
 
     const nameErr = await validateNameUnique(formData.name, data);
-    if (nameErr) {
-      setNameError(nameErr);
-      return;
-    }
+    if (nameErr) { setNameError(nameErr); return; }
 
-    await savePlayer({ ...formData, imageUrl });
+    await savePlayer({
+      name: formData.name,
+      phone: formData.phone,
+      birthdate: formData.birthdate,
+      nationalId: formData.nationalId,
+    });
 
-    // reset بعد الحفظ
-    setFormData({ name: "", phone: "", birthdate: "" });
-    setImageUrl(null);
+    setFormData({ name: "", phone: "", birthdate: "", nationalId: "" });
+    setNationalIdValid(false);
     setNameError(null);
     setBirthdateError(null);
   };
@@ -92,10 +93,10 @@ export default function Single({ data, onUpdateSelection }) {
       <Card
         formData={formData}
         handleInputChange={handleInputChange}
-        handleImageChange={setImageUrl}
+        handleNationalIdChange={handleNationalIdChange}
+        onNationalIdValidation={setNationalIdValid}
       />
 
-      {/* خطأ الاسم */}
       {nameError && (
         <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3">
           <span>⚠️</span>
@@ -107,8 +108,6 @@ export default function Single({ data, onUpdateSelection }) {
           جارٍ التحقق من الاسم...
         </p>
       )}
-
-      {/* خطأ تاريخ الميلاد */}
       {birthdateError && (
         <div role="alert" className="flex items-center gap-2 bg-orange-50 border border-orange-300 text-orange-700 text-sm rounded-xl px-4 py-3">
           <span>📅</span>

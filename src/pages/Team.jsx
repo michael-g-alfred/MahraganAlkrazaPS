@@ -11,9 +11,9 @@ export default function Team({ data, onUpdateSelection }) {
   const [playerCount, setPlayerCount] = useState("");
   const [players, setPlayers] = useState([]);
 
-  // أخطاء: مصفوفة بنفس طول players
   const [playerErrors, setPlayerErrors] = useState([]);
   const [checkingNames, setCheckingNames] = useState([]);
+  const [nationalIdValids, setNationalIdValids] = useState([]); // ← جديد
 
   const [loadingFetch, errorFetch, playersData] = useFetch();
 
@@ -25,11 +25,11 @@ export default function Team({ data, onUpdateSelection }) {
   const parsedCount = parseInt(playerCount, 10);
   const countIsValid = !isNaN(parsedCount) && parsedCount >= 2 && parsedCount <= 12;
 
-  // Reset كل حاجة لما يتغير عدد اللاعبين
   useEffect(() => {
     setPlayers([]);
     setPlayerErrors([]);
     setCheckingNames([]);
+    setNationalIdValids([]);
   }, [playerCount]);
 
   const handleGeneratePlayers = () => {
@@ -37,11 +37,12 @@ export default function Team({ data, onUpdateSelection }) {
       name: "",
       phone: "",
       birthdate: "",
-      imageUrl: null,
+      nationalId: "",
     }));
     setPlayers(newPlayers);
     setPlayerErrors(Array(parsedCount).fill({ birthdate: null, name: null }));
     setCheckingNames(Array(parsedCount).fill(false));
+    setNationalIdValids(Array(parsedCount).fill(false));
   };
 
   const handlePlayerChange = (index, field, value) => {
@@ -49,7 +50,6 @@ export default function Team({ data, onUpdateSelection }) {
       prev.map((player, i) => (i === index ? { ...player, [field]: value } : player))
     );
 
-    // تحقق من تاريخ الميلاد فور تغييره
     if (field === "birthdate" && data?.stage?.name) {
       const error = validateBirthdate(value, data.stage.name);
       setPlayerErrors((prev) =>
@@ -57,29 +57,29 @@ export default function Team({ data, onUpdateSelection }) {
       );
     }
 
-    // تحقق من الاسم بـ debounce
     if (field === "name") {
-      setCheckingNames((prev) =>
-        prev.map((c, i) => (i === index ? true : c))
-      );
-
-      // نلغي الـ timeout القديم عن طريق key فريد لكل لاعب
+      setCheckingNames((prev) => prev.map((c, i) => (i === index ? true : c)));
       clearTimeout(window[`nameTimer_${index}`]);
       window[`nameTimer_${index}`] = setTimeout(async () => {
         const error = await validateNameUnique(value, data);
         setPlayerErrors((prev) =>
           prev.map((e, i) => (i === index ? { ...e, name: error } : e))
         );
-        setCheckingNames((prev) =>
-          prev.map((c, i) => (i === index ? false : c))
-        );
+        setCheckingNames((prev) => prev.map((c, i) => (i === index ? false : c)));
       }, 600);
     }
   };
 
-  const handleImageChange = (index, url) => {
+  const handleNationalIdChange = (index, val) => {
     setPlayers((prev) =>
-      prev.map((player, i) => (i === index ? { ...player, imageUrl: url } : player))
+      prev.map((player, i) => (i === index ? { ...player, nationalId: val } : player))
+    );
+  };
+
+  // callback من NationalIdInput لكل لاعب
+  const handleNationalIdValidation = (index, isValid) => {
+    setNationalIdValids((prev) =>
+      prev.map((v, i) => (i === index ? isValid : v))
     );
   };
 
@@ -87,16 +87,18 @@ export default function Team({ data, onUpdateSelection }) {
     playerErrors.some((e) => e?.birthdate || e?.name) ||
     checkingNames.some(Boolean);
 
+  const allNationalIdsValid = nationalIdValids.length > 0 && nationalIdValids.every(Boolean);
+
   const isTeamValid =
     teamName.trim() &&
     !teamsArr.includes(teamName.trim()) &&
     players.length >= 2 &&
-    players.every((p) => p.name?.trim() && p.phone?.trim() && p.birthdate && p.imageUrl) &&
+    players.every((p) => p.name?.trim() && p.phone?.trim() && p.birthdate) &&
+    allNationalIdsValid &&   // ← كل الأرقام القومية صحيحة ومتاحة
     !hasAnyError &&
     !loading;
 
   const handleSave = async () => {
-    // تحقق نهائي قبل الحفظ
     const finalErrors = await Promise.all(
       players.map(async (p) => ({
         birthdate: validateBirthdate(p.birthdate, data?.stage?.name),
@@ -104,9 +106,7 @@ export default function Team({ data, onUpdateSelection }) {
       }))
     );
     setPlayerErrors(finalErrors);
-
-    const hasError = finalErrors.some((e) => e.birthdate || e.name);
-    if (hasError) return;
+    if (finalErrors.some((e) => e.birthdate || e.name)) return;
 
     await saveTeam(players, teamName.trim());
     setTeamName("");
@@ -114,6 +114,7 @@ export default function Team({ data, onUpdateSelection }) {
     setPlayerCount("");
     setPlayerErrors([]);
     setCheckingNames([]);
+    setNationalIdValids([]);
   };
 
   return (
@@ -123,12 +124,10 @@ export default function Team({ data, onUpdateSelection }) {
       aria-label="استمارة تسجيل فريق"
     >
       <div className="flex flex-col gap-4">
-        {/* Team name */}
         <div className="flex flex-col gap-2">
           <label htmlFor="teamName" className="text-blue-700 font-semibold">
             اسم الفريق
           </label>
-
           {loadingFetch ? (
             <Loader size={4} />
           ) : errorFetch ? (
@@ -142,7 +141,6 @@ export default function Team({ data, onUpdateSelection }) {
               </p>
             )
           )}
-
           <input
             id="teamName"
             type="text"
@@ -151,7 +149,6 @@ export default function Team({ data, onUpdateSelection }) {
             onChange={(e) => setTeamName(e.target.value)}
             className="border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-700"
           />
-
           {teamsArr.includes(teamName.trim()) && teamName.trim() && (
             <p role="alert" className="text-red-500 text-sm">
               هذا الاسم مستخدم بالفعل، اختر اسمًا آخر.
@@ -159,7 +156,6 @@ export default function Team({ data, onUpdateSelection }) {
           )}
         </div>
 
-        {/* Player count */}
         <div className="flex flex-col gap-2">
           <label htmlFor="playerCount" className="text-blue-700 font-semibold">
             عدد اللاعبين بالفريق (من 2 إلى 12)
@@ -207,10 +203,10 @@ export default function Team({ data, onUpdateSelection }) {
                 handleInputChange={(e) =>
                   handlePlayerChange(index, e.target.name, e.target.value)
                 }
-                handleImageChange={(url) => handleImageChange(index, url)}
+                handleNationalIdChange={(val) => handleNationalIdChange(index, val)}
+                onNationalIdValidation={(isValid) => handleNationalIdValidation(index, isValid)}
               />
 
-              {/* أخطاء اللاعب */}
               {playerErrors[index]?.name && (
                 <div role="alert" className="mt-2 flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3">
                   <span>⚠️</span>

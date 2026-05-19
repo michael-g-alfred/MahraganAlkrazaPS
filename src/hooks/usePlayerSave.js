@@ -19,16 +19,10 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
     });
   };
 
-  const savePlayer = async ({ name, phone, birthdate, imageUrl }) => {
-    // ===== DEBUG =====
-    console.log("🔗 BASE_URL:", BASE_URL);
-    console.log("📦 selectionData:", selectionData);
-    console.log("👤 player fields:", { name, phone, birthdate, imageUrl });
-    // =================
-
+  const savePlayer = async ({ name, phone, birthdate, nationalId }) => {
     setLoading(true);
     const player = {
-      image: imageUrl || "",
+      nationalId: nationalId || "",
       name,
       gender: selectionData?.gender?.name || "",
       game: selectionData?.game?.name || "",
@@ -39,17 +33,12 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
       form: selectionData?.form?.name || "",
     };
 
-    console.log("💾 player to save:", player);
-
     try {
       const response = await fetch(`${BASE_URL}/players.json`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(player),
       });
-
-      console.log("📡 response status:", response.status);
-
       if (!response.ok) throw new Error("Failed to save player");
       dispatch(addPlayer(player));
       toast.success("تم حفظ اللاعب بنجاح 🎉");
@@ -63,19 +52,12 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
   };
 
   const saveTeam = async (players, teamName) => {
-    // ===== DEBUG =====
-    console.log("🔗 BASE_URL:", BASE_URL);
-    console.log("📦 selectionData:", selectionData);
-    console.log("👥 players:", players);
-    console.log("🏷️ teamName:", teamName);
-    // =================
-
     setLoading(true);
     try {
       for (const p of players) {
         const playerData = {
           name: p.name,
-          image: p.imageUrl || "",
+          nationalId: p.nationalId || "",
           gender: selectionData?.gender?.name || "",
           game: selectionData?.game?.name || "",
           stage: selectionData?.stage?.name || "",
@@ -86,20 +68,14 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
           team: teamName,
         };
 
-        console.log("💾 saving player:", playerData);
-
         const response = await fetch(`${BASE_URL}/players.json`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(playerData),
         });
-
-        console.log("📡 response status:", response.status);
-
         if (!response.ok) throw new Error("Failed to save team member");
         dispatch(addPlayer(playerData));
       }
-
       toast.success("تم حفظ الفريق بالكامل بنجاح 🎉");
       resetSelection();
     } catch (err) {

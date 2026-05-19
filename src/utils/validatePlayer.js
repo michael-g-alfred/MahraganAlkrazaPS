@@ -58,7 +58,8 @@ function normalizeName(str) {
 }
 
 /**
- * التحقق من تكرار الاسم في نفس المرحلة واللعبة والنوع
+ * التحقق من تكرار الاسم في نفس المرحلة والنوع بغض النظر عن اللعبة
+ * — لمنع تسجيل نفس اللاعب في أكثر من لعبة
  */
 export async function validateNameUnique(name, selectionData) {
   if (!name?.trim() || !selectionData?.stage?.name) return null;
@@ -72,19 +73,17 @@ export async function validateNameUnique(name, selectionData) {
 
     const players = Object.values(data);
     const stageName = selectionData.stage?.name || "";
-    const gameName = selectionData.game?.name || "";
     const genderName = selectionData.gender?.name || "";
 
     const duplicate = players.find(
       (p) =>
         normalizeName(p.name) === normalizeName(name) &&
         p.stage === stageName &&
-        p.game === gameName &&
         p.gender === genderName,
     );
 
     if (duplicate) {
-      return `الاسم "${name}" مسجل بالفعل في ${stageName} - ${gameName} - ${genderName}`;
+      return `الاسم "${name}" مسجل بالفعل في ${stageName} - ${genderName} (لا يمكن التسجيل في أكثر من لعبة)`;
     }
 
     return null;
