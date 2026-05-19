@@ -1,3 +1,18 @@
+// دالة مساعدة مطورة: تحول الأرقام العشرية مباشرة إلى أرقام للمقارنة العادلة بدون تعقيد النصوص
+export function timeToMs(timeValue) {
+  if (
+    timeValue === undefined ||
+    timeValue === null ||
+    timeValue === "" ||
+    timeValue === "00:00:00"
+  )
+    return Infinity;
+
+  // إذا كانت القيمة ممررة كنص أو رقم عشري (مثال 12.35) نقوم بتحويلها مباشرة لـ Number
+  const parsed = Number(timeValue);
+  return isNaN(parsed) ? Infinity : parsed;
+}
+
 function shuffleArray(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -7,101 +22,193 @@ function shuffleArray(arr) {
   return a;
 }
 
+// توليد الهيكل المبدئي للقرعة
 export default function generateBracket(items, isTeam = false) {
-  // deduplicate teams
-  const unique =
-    isTeam ? [...new Map(items.map((p) => [p.team, p])).values()] : items;
+  if (items.length < 2) return null;
 
-  const shuffled = shuffleArray(unique);
-
-  const getName = (x) => (isTeam ? x.team : x.name) || "؟";
-
-  // pad to next power of 2 with "bye"
-  let size = 1;
-  while (size < shuffled.length) size *= 2;
-
-  const padded = [...shuffled];
-  while (padded.length < size) padded.push(null); // null = bye
-
-  const roundNames = [
-    "دور الـ" + size,
-    "ربع النهائي",
-    "نصف النهائي",
-    "النهائي",
-  ];
-  // dynamic round names
-  const getRoundName = (totalRounds, roundIndex) => {
-    const fromEnd = totalRounds - 1 - roundIndex;
-    if (fromEnd === 0) return "النهائي";
-    if (fromEnd === 1) return "نصف النهائي";
-    if (fromEnd === 2) return "ربع النهائي";
-    return `دور الـ${Math.pow(2, fromEnd + 1)}`;
-  };
-
-  const totalRounds = Math.log2(size);
-  const rounds = [];
-
-  // Round 1 - real players
+  const isRelay = items[0]?.game && items[0].game.includes("تتابع");
   const firstRoundMatches = [];
-  for (let i = 0; i < padded.length; i += 2) {
-    const p1 = padded[i];
-    const p2 = padded[i + 1];
-    const isBye = !p2; // p1 gets auto-advance if bye
-    firstRoundMatches.push({
-      id: `r0_m${i / 2}`,
-      p1: p1 ? getName(p1) : "BYE",
-      p2: p2 ? getName(p2) : "BYE",
-      score1: isBye ? 1 : null,
-      score2: isBye ? 0 : null,
-      winner:
-        isBye ?
-          p1 ? getName(p1)
-          : null
-        : null,
-      isBye,
+
+  if (isRelay) {
+    const churchGroups = {};
+    items.forEach((p) => {
+      const cName = p.church || "كنيسة غير معروفة";
+      if (!churchGroups[cName]) churchGroups[cName] = [];
+      churchGroups[cName].push(isTeam ? p.team : p.name);
     });
-  }
-  rounds.push({
-    roundName: getRoundName(totalRounds, 0),
-    matches: firstRoundMatches,
-  });
 
-  // Subsequent rounds — empty slots waiting for winners
-  let prevCount = firstRoundMatches.length;
-  for (let r = 1; r < totalRounds; r++) {
-    const matches = [];
-    for (let m = 0; m < prevCount / 2; m++) {
-      matches.push({
-        id: `r${r}_m${m}`,
-        p1: null,
-        p2: null,
-        score1: null,
-        score2: null,
+    Object.keys(churchGroups).forEach((churchName, idx) => {
+      firstRoundMatches.push({
+        id: `r0_c${idx}`,
+        churchName: churchName,
+        players: churchGroups[churchName].map((pName) => ({
+          name: pName,
+          score: "", // قيمة فارغة مجهزة للعداد الرقمي الجديد
+        })),
         winner: null,
-        isBye: false,
+        isRelay: true,
       });
+    });
+  } else {
+    const unique =
+      isTeam ? [...new Map(items.map((p) => [p.team, p])).values()] : items;
+    const shuffled = shuffleArray(unique);
+    const getName = (x) => (isTeam ? x.team : x.name) || "؟";
+    const players = shuffled.map((p) => getName(p));
+
+    for (let i = 0; i < players.length; i += 2) {
+      const p1 = players[i];
+      const p2 = players[i + 1];
+
+      if (p2) {
+        firstRoundMatches.push({
+          id: `r0_m${firstRoundMatches.length}`,
+          p1: p1,
+          p2: p2,
+          score1: null,
+          score2: null,
+          winner: null,
+          isBye: false,
+          isRelay: false,
+        });
+      } else {
+        firstRoundMatches.push({
+          id: `r0_m${firstRoundMatches.length}`,
+          p1: p1,
+          p2: "BYE",
+          score1: 1,
+          score2: 0,
+          winner: p1,
+          isBye: true,
+          isRelay: false,
+        });
+      }
     }
-    rounds.push({ roundName: getRoundName(totalRounds, r), matches });
-    prevCount = matches.length;
   }
 
-  // Auto-advance byes into round 2
-  propagateWinners(rounds);
+  const rounds = [
+    {
+      roundName: "الدور الأول (تصفيات الكنائس)",
+      matches: firstRoundMatches,
+    },
+  ];
 
+  propagateWinners(rounds);
   return { rounds, generatedAt: new Date().toISOString() };
 }
 
+// دالة التصعيد للأدوار المتقدمة
 export function propagateWinners(rounds) {
-  for (let r = 0; r < rounds.length - 1; r++) {
-    const currentMatches = rounds[r].matches;
-    const nextMatches = rounds[r + 1].matches;
-    currentMatches.forEach((match, mIdx) => {
-      if (!match.winner) return;
-      const nextMatchIdx = Math.floor(mIdx / 2);
-      const slot = mIdx % 2 === 0 ? "p1" : "p2";
-      if (nextMatches[nextMatchIdx]) {
-        nextMatches[nextMatchIdx][slot] = match.winner;
+  let currentRoundIdx = 0;
+
+  if (rounds[rounds.length - 1]?.roundName === "بطل المسابقة") {
+    rounds.pop();
+  }
+
+  while (currentRoundIdx < rounds.length) {
+    const currentRound = rounds[currentRoundIdx];
+    const allMatchesFinished = currentRound.matches.every(
+      (m) => m.winner !== null,
+    );
+
+    if (allMatchesFinished && currentRound.matches.length > 0) {
+      const rawWinners = currentRound.matches
+        .map((m) => m.winner)
+        .filter(Boolean);
+
+      if (rawWinners.length <= 1) {
+        if (rawWinners.length === 1) {
+          rounds.push({
+            roundName: "بطل المسابقة",
+            matches: [
+              {
+                id: "champion_box",
+                p1: rawWinners[0],
+                winner: rawWinners[0],
+                isChampion: true,
+                isBye: true,
+              },
+            ],
+          });
+        }
+        break;
       }
-    });
+
+      const nextRoundIdx = currentRoundIdx + 1;
+      const nextRoundExists = !!rounds[nextRoundIdx];
+      const isRelay = currentRound.matches[0]?.isRelay;
+
+      let winners = [];
+      if (nextRoundExists) {
+        const existingMatches = rounds[nextRoundIdx].matches;
+        existingMatches.forEach((m) => {
+          if (m.p1 && m.p1 !== "BYE") winners.push(m.p1);
+          if (m.p2 && m.p2 !== "BYE") winners.push(m.p2);
+        });
+        if (winners.length !== rawWinners.length) winners = rawWinners;
+      } else {
+        winners = shuffleArray(rawWinners);
+      }
+
+      let nextRoundName = `الدور التالي`;
+      if (winners.length <= 2) nextRoundName = "النهائي";
+      else if (winners.length <= 4) nextRoundName = "نصف النهائي";
+      else if (winners.length <= 8) nextRoundName = "ربع النهائي";
+
+      const nextRoundMatches = [];
+      for (let i = 0; i < winners.length; i += 2) {
+        const p1 = winners[i];
+        const p2 = winners[i + 1];
+
+        if (p2) {
+          nextRoundMatches.push({
+            id: `r${nextRoundIdx}_m${nextRoundMatches.length}`,
+            p1: p1,
+            p2: p2,
+            score1: isRelay ? "" : null,
+            score2: isRelay ? "" : null,
+            winner: null,
+            isBye: false,
+            isRelay: isRelay,
+          });
+        } else {
+          nextRoundMatches.push({
+            id: `r${nextRoundIdx}_m${nextRoundMatches.length}`,
+            p1: p1,
+            p2: "BYE",
+            score1: isRelay ? "" : 1,
+            score2: isRelay ? "999.99" : 0,
+            winner: p1,
+            isBye: true,
+            isRelay: isRelay,
+          });
+        }
+      }
+
+      if (nextRoundExists) {
+        const existingRound = rounds[nextRoundIdx];
+        nextRoundMatches.forEach((newMatch, idx) => {
+          if (existingRound.matches[idx]) {
+            if (
+              existingRound.matches[idx].p1 === newMatch.p1 &&
+              existingRound.matches[idx].p2 === newMatch.p2
+            ) {
+              newMatch.score1 = existingRound.matches[idx].score1;
+              newMatch.score2 = existingRound.matches[idx].score2;
+              newMatch.winner = existingRound.matches[idx].winner;
+            }
+          }
+        });
+        rounds[nextRoundIdx] = {
+          roundName: nextRoundName,
+          matches: nextRoundMatches,
+        };
+      } else {
+        rounds.push({ roundName: nextRoundName, matches: nextRoundMatches });
+      }
+    } else {
+      break;
+    }
+    currentRoundIdx++;
   }
 }
