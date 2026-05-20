@@ -262,7 +262,7 @@ export default function Admin() {
       .length ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-50" dir="rtl">
+    <div className="min-h-screen" dir="rtl">
       {/* Header */}
       <div className="flex justify-between items-center bg-blue-700 text-white px-4 py-3 rounded-b-2xl shadow-md mb-4">
         <div className="flex items-center gap-2">
@@ -274,7 +274,7 @@ export default function Admin() {
             logout();
             navigate("/login");
           }}
-          className="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-1.5 rounded-full font-medium transition">
+          className="text-red-600 bg-red-100 border border-red-700 hover:bg-red-700 hover:text-white text-sm px-4 py-1.5 rounded-full font-medium transition">
           خروج
         </button>
       </div>
@@ -408,7 +408,7 @@ export default function Admin() {
             </div>
 
             {/* Matches for active round */}
-            <div className="flex flex-col gap-3 pb-6">
+            <div className="flex flex-col gap-3 pb-6 bg-slate-100/70 border-2 border-slate-400/50 p-4 rounded-xl">
               {currentRound?.matches.map((match, matchIdx) => {
                 if (match.isChampion) {
                   return (

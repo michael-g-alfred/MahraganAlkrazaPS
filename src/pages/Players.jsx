@@ -3,11 +3,13 @@ import toast from "react-hot-toast";
 import Loader from "../components/Loader";
 import useFetch from "../hooks/useFetch";
 import SelectBox from "../components/SelectBox";
+import Pagination from "../components/Pagination";
 import { useAuth } from "../context/AuthContext";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
-const ALLOWED_DELETE_ALL_EMAIL = "michoolgeorge@gmail.com";
+const ALLOWED_ACTION = "michoolgeorge@gmail.com";
+const ITEMS_PER_PAGE = 20;
 
 function getInitials(name = "") {
   const parts = name.trim().split(" ").filter(Boolean);
@@ -69,29 +71,25 @@ function PlayerCard({ player, index, canAction, onDelete }) {
 
   return (
     <div
-      className={`bg-white border rounded-2xl overflow-hidden transition-all ${
+      className={`bg-slate-100/50 border border-slate-400/50 rounded-2xl overflow-hidden transition-all ${
         expanded ? "border-blue-200" : "border-slate-100"
       }`}>
-      {/* Header — دائماً مرئي */}
       <div
         className="flex items-center gap-3 px-3 py-3 cursor-pointer select-none"
         onClick={() => setExpanded((v) => !v)}
         role="button"
         aria-expanded={expanded}
         aria-label={`تفاصيل ${player.name}`}>
-        {/* الترتيب */}
-        <span className="text-xs text-slate-400 w-5 text-center flex-shrink-0">
+        <span className="text-xs text-slate-400 w-5 text-center flex-shrink-0 font-bold font-mono">
           {index + 1}
         </span>
 
-        {/* الصورة الرمزية */}
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0"
           style={{ background: color.bg, color: color.text }}>
           {initials}
         </div>
 
-        {/* الاسم وتحته الرقم القومي */}
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
           <p className="text-sm font-semibold text-slate-900 truncate">
             {player.name}
@@ -104,13 +102,11 @@ function PlayerCard({ player, index, canAction, onDelete }) {
           </p>
         </div>
 
-        {/* الشارات تظهر بالخارج فقط في الشاشات الكبيرة والمتوسطة md */}
         <div className="hidden md:flex items-center gap-1 flex-shrink-0">
           <GenderBadge gender={player.gender} />
           <FormBadge form={player.form} />
         </div>
 
-        {/* السهم جهة اليسار */}
         <svg
           className={`w-5 h-5 text-slate-400 flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
           fill="none"
@@ -126,36 +122,30 @@ function PlayerCard({ player, index, canAction, onDelete }) {
         </svg>
       </div>
 
-      {/* التفاصيل عند التوسيع */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-slate-100">
-          {/* الشارات تظهر هنا فقط في الموبايل الصغير وتختفي في الشاشات الأكبر md لأنها معروضة بالخارج بالفعل */}
           <div className="flex md:hidden items-center gap-2 pt-3 pb-1">
             <GenderBadge gender={player.gender} />
             <FormBadge form={player.form} />
           </div>
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-2 text-xs">
-            <DetailItem label="اللعبة">{player.game || "—"}</DetailItem>
             <DetailItem label="المرحلة">{player.stage || "—"}</DetailItem>
             <DetailItem label="تاريخ الميلاد">
               {player.birthdate || "—"}
             </DetailItem>
+            <DetailItem label="اللعبة">{player.game || "—"}</DetailItem>
             <DetailItem label="التليفون">
               <span className="font-mono">{player.phone || "—"}</span>
             </DetailItem>
-            <div className="col-span-2">
-              <DetailItem label="الكنيسة">{player.church || "—"}</DetailItem>
-            </div>
-            <div className="col-span-2">
-              <DetailItem label="الفريق">
-                {player.team ?
-                  <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 rounded-full px-2.5 py-0.5 text-xs font-medium">
-                    {player.team}
-                  </span>
-                : <span className="text-slate-400">—</span>}
-              </DetailItem>
-            </div>
+            <DetailItem label="الكنيسة">{player.church || "—"}</DetailItem>
+            <DetailItem label="الفريق">
+              {player.team ?
+                <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  {player.team}
+                </span>
+              : <span className="text-slate-400">—</span>}
+            </DetailItem>
           </div>
 
           {canAction && (
@@ -164,15 +154,14 @@ function PlayerCard({ player, index, canAction, onDelete }) {
                 e.stopPropagation();
                 onDelete(player);
               }}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-red-600 bg-red-50 border border-red-100 text-xs font-medium hover:bg-red-100 transition"
+              className="mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-red-600 bg-red-100 border border-red-700 text-xs font-medium hover:bg-red-700 hover:text-white transition"
               aria-label={`حذف اللاعب ${player.name}`}>
               <svg
                 className="w-4 h-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={1.5}
-                aria-hidden="true">
+                strokeWidth={1.5}>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -192,18 +181,19 @@ function DetailItem({ label, children }) {
   return (
     <div>
       <p className="text-slate-400 mb-0.5">{label}</p>
-      <div className="text-slate-900 font-medium truncate">{children}</div>
+      <div className="text-slate-900 font-medium">{children}</div>
     </div>
   );
 }
 
 export default function Players() {
   const { user } = useAuth();
-  const canAction = user?.email?.toLowerCase() === ALLOWED_DELETE_ALL_EMAIL;
+  const canAction = user?.email?.toLowerCase() === ALLOWED_ACTION;
 
   const [loadingFetch, errorFetch, players] = useFetch();
   const [localPlayers, setLocalPlayers] = useState([]);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setLocalPlayers(players);
@@ -220,6 +210,11 @@ export default function Players() {
 
   const isFiltered = Object.values(filter).some(Boolean);
 
+  const handleFilterChange = (key, value) => {
+    setFilter((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+  };
+
   const filteredPlayers = useMemo(
     () =>
       localPlayers.filter((p) => {
@@ -233,6 +228,13 @@ export default function Players() {
       }),
     [localPlayers, filter],
   );
+
+  const totalPages = Math.ceil(filteredPlayers.length / ITEMS_PER_PAGE);
+
+  const paginatedPlayers = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredPlayers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredPlayers, currentPage]);
 
   const genders = useMemo(
     () => [...new Set(localPlayers.map((p) => p.gender).filter(Boolean))],
@@ -263,6 +265,11 @@ export default function Players() {
     if (!window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) return;
     const prev = [...localPlayers];
     setLocalPlayers((p) => p.filter((x) => x.id !== player.id));
+
+    if (paginatedPlayers.length === 1 && currentPage > 1) {
+      setCurrentPage((prev) => prev - 1);
+    }
+
     fetch(`${BASE_URL}/players/${player.id}.json`, { method: "DELETE" })
       .then((res) => {
         if (!res.ok) throw new Error();
@@ -284,6 +291,7 @@ export default function Players() {
     setDeletingAll(true);
     const prev = [...localPlayers];
     setLocalPlayers([]);
+    setCurrentPage(1);
     try {
       const res = await fetch(`${BASE_URL}/players.json`, { method: "DELETE" });
       if (!res.ok) throw new Error();
@@ -333,10 +341,7 @@ export default function Players() {
 
   if (loadingFetch) {
     return (
-      <div
-        className="flex justify-center items-center py-20"
-        role="status"
-        aria-label="جاري التحميل">
+      <div className="flex justify-center items-center py-20" role="status">
         <Loader />
       </div>
     );
@@ -352,16 +357,13 @@ export default function Players() {
 
   if (localPlayers.length === 0) {
     return (
-      <div
-        className="flex flex-col items-center gap-3 py-20 text-slate-400"
-        role="status">
+      <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
         <svg
           className="w-12 h-12 text-slate-300"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
-          strokeWidth={1}
-          aria-hidden="true">
+          strokeWidth={1}>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -376,48 +378,45 @@ export default function Players() {
   return (
     <div className="min-h-screen" dir="rtl">
       {/* الفلتر */}
-      <div
-        className="flex flex-wrap justify-center gap-3 mb-4"
-        role="search"
-        aria-label="تصفية اللاعبين">
+      <div className="flex flex-wrap justify-center gap-3 mb-4" role="search">
         <SelectBox
           label="كل الأنواع"
           value={filter.gender}
-          onChange={(e) => setFilter({ ...filter, gender: e.target.value })}
+          onChange={(e) => handleFilterChange("gender", e.target.value)}
           options={genders}
         />
         <SelectBox
           label="كل المراحل"
           value={filter.stage}
-          onChange={(e) => setFilter({ ...filter, stage: e.target.value })}
+          onChange={(e) => handleFilterChange("stage", e.target.value)}
           options={stages}
         />
         <SelectBox
           label="كل الألعاب"
           value={filter.game}
-          onChange={(e) => setFilter({ ...filter, game: e.target.value })}
+          onChange={(e) => handleFilterChange("game", e.target.value)}
           options={games}
         />
         <SelectBox
           label="كل الكنائس"
           value={filter.church}
-          onChange={(e) => setFilter({ ...filter, church: e.target.value })}
+          onChange={(e) => handleFilterChange("church", e.target.value)}
           options={churches}
         />
         <SelectBox
           label="كل الإستمارات"
           value={filter.form}
-          onChange={(e) => setFilter({ ...filter, form: e.target.value })}
+          onChange={(e) => handleFilterChange("form", e.target.value)}
           options={forms}
         />
         <SelectBox
           label="كل الفرق"
           value={filter.team}
-          onChange={(e) => setFilter({ ...filter, team: e.target.value })}
+          onChange={(e) => handleFilterChange("team", e.target.value)}
           options={teams}
         />
         <button
-          onClick={() =>
+          onClick={() => {
             setFilter({
               gender: "",
               game: "",
@@ -425,22 +424,17 @@ export default function Players() {
               stage: "",
               church: "",
               team: "",
-            })
-          }
+            });
+            setCurrentPage(1);
+          }}
           disabled={!isFiltered}
-          aria-label="مسح كل الفلاتر"
-          className={`${
-            isFiltered ?
-              "bg-blue-700 hover:bg-blue-800 text-white cursor-pointer"
-            : "bg-gray-300 cursor-not-allowed text-gray-400"
-          } px-4 py-2 rounded-lg transition`}>
+          className={`${isFiltered ? "bg-blue-700 hover:bg-blue-800 text-white cursor-pointer" : "bg-slate-300 cursor-not-allowed text-slate-400"} px-4 py-2 rounded-lg transition`}>
           <svg
             className="w-5 h-5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
-            strokeWidth={1.5}
-            aria-hidden="true">
+            strokeWidth={1.5}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -462,18 +456,13 @@ export default function Players() {
           <button
             onClick={handleExportExcel}
             disabled={filteredPlayers.length === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
-              filteredPlayers.length === 0 ?
-                "bg-gray-300 text-gray-400 cursor-not-allowed"
-              : "bg-green-700 hover:bg-green-800 text-white cursor-pointer"
-            }`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${filteredPlayers.length === 0 ? "bg-slate-300 text-slate-400 cursor-not-allowed" : "text-green-600 bg-green-100 border border-green-700 text-xs font-medium hover:bg-green-700 hover:text-white cursor-pointer"}`}>
             <svg
               className="w-4 h-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true">
+              strokeWidth={2}>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -488,18 +477,13 @@ export default function Players() {
           <button
             onClick={handleDeleteAll}
             disabled={deletingAll || localPlayers.length === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
-              deletingAll || localPlayers.length === 0 ?
-                "bg-gray-300 text-gray-400 cursor-not-allowed"
-              : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-            }`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${deletingAll || localPlayers.length === 0 ? "bg-slate-300 text-slate-400 cursor-not-allowed" : "text-red-600 bg-red-100 border border-red-700 text-xs font-medium hover:bg-red-700 hover:text-white transition cursor-pointer"}`}>
             <svg
               className="w-4 h-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true">
+              strokeWidth={2}>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -517,17 +501,25 @@ export default function Players() {
           <p className="text-base font-medium">لا توجد نتائج</p>
           <p className="text-sm mt-1">حاول تغيير الفلتر</p>
         </div>
-      : <div className="flex flex-col gap-2 pb-8">
-          {filteredPlayers.map((player, index) => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              index={index}
-              canAction={canAction}
-              onDelete={handleDeleteItem}
-            />
-          ))}
-        </div>
+      : <>
+          <div className="flex flex-col gap-2 pb-4">
+            {paginatedPlayers.map((player, index) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                index={(currentPage - 1) * ITEMS_PER_PAGE + index}
+                canAction={canAction}
+                onDelete={handleDeleteItem}
+              />
+            ))}
+          </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </>
       }
     </div>
   );
