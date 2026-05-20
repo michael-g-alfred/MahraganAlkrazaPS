@@ -15,7 +15,7 @@ function getInitials(name = "") {
   const parts = name.trim().split(" ").filter(Boolean);
   if (parts.length === 0) return "؟";
   if (parts.length === 1) return parts[0][0];
-  return parts[0][0] + parts[1][0];
+  return parts[0][0];
 }
 
 const AVATAR_COLORS = [

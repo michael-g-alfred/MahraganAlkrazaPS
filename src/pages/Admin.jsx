@@ -5,10 +5,7 @@ import useFetch from "../hooks/useFetch";
 import useBracket from "../hooks/useBracket";
 import SelectBox from "../components/SelectBox";
 import Loader from "../components/Loader";
-import generateBracket, {
-  propagateWinners,
-  timeToMs,
-} from "../utils/generateBracket";
+import generateBracket, { propagateWinners } from "../utils/generateBracket";
 import toast from "react-hot-toast";
 
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
@@ -174,15 +171,18 @@ export default function Admin() {
       toast.error("برجاء إدخال توقيتات صحيحة أكبر من الصفر");
       return;
     }
+
+    // ✅ parseFloat بدل timeToMs — الأقل وقت يكسب
     let bestPlayer = group.players[0];
-    let minMs = timeToMs(bestPlayer.score);
+    let minTime = parseFloat(bestPlayer.score);
     for (let i = 1; i < group.players.length; i++) {
-      const ms = timeToMs(group.players[i].score);
-      if (ms < minMs) {
-        minMs = ms;
+      const t = parseFloat(group.players[i].score);
+      if (t < minTime) {
+        minTime = t;
         bestPlayer = group.players[i];
       }
     }
+
     setSaving(true);
     try {
       const updated = JSON.parse(JSON.stringify(localBracket));
@@ -221,8 +221,9 @@ export default function Admin() {
     }
     let winner = "";
     if (match.isRelay) {
-      const t1 = timeToMs(match.score1);
-      const t2 = timeToMs(match.score2);
+      // ✅ parseFloat بدل timeToMs — الأقل وقت يكسب
+      const t1 = parseFloat(match.score1);
+      const t2 = parseFloat(match.score2);
       if (t1 === t2) {
         toast.error("لا يمكن تعادل الأوقات في التتابع");
         return;
@@ -255,7 +256,6 @@ export default function Admin() {
   const isFirstRoundRelay =
     activeRoundIdx === 0 && localBracket?.rounds?.[0]?.matches?.[0]?.players;
 
-  // progress indicator
   const totalRounds = localBracket?.rounds?.length ?? 0;
   const completedRounds =
     localBracket?.rounds?.filter((r) => r.matches.every((m) => m.winner))
@@ -359,7 +359,7 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Bracket Board — mobile-first vertical layout */}
+        {/* Bracket Board */}
         {!bracketLoading && localBracket && (
           <>
             {/* Progress */}
@@ -376,11 +376,11 @@ export default function Admin() {
                 />
               </div>
               <span className="text-xs text-slate-500 whitespace-nowrap">
-                {completedRounds}/{totalRounds} أدوار
+                {completedRounds}/{totalRounds}
               </span>
             </div>
 
-            {/* Round tabs — horizontal scroll */}
+            {/* Round tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1">
               {localBracket.rounds.map((round, idx) => {
                 const done = round.matches.every((m) => m.winner);
