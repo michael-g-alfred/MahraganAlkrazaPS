@@ -1,4 +1,4 @@
-// دالة مساعدة مطورة: تحول الأرقام العشرية مباشرة إلى أرقام للمقارنة العادلة بدون تعقيد النصوص
+// تحويل الوقت بصيغة MM:SS:cs إلى centiseconds للمقارنة
 export function timeToMs(timeValue) {
   if (
     timeValue === undefined ||
@@ -8,9 +8,32 @@ export function timeToMs(timeValue) {
   )
     return Infinity;
 
-  // إذا كانت القيمة ممررة كنص أو رقم عشري (مثال 12.35) نقوم بتحويلها مباشرة لـ Number
-  const parsed = Number(timeValue);
-  return isNaN(parsed) ? Infinity : parsed;
+  const str = String(timeValue).trim();
+
+  // صيغة MM:SS:cs
+  const parts = str.split(":");
+  if (parts.length === 3) {
+    const mm = parseInt(parts[0], 10);
+    const ss = parseInt(parts[1], 10);
+    const cs = parseInt(parts[2], 10);
+    if (isNaN(mm) || isNaN(ss) || isNaN(cs)) return Infinity;
+    if (ss > 59 || cs > 99) return Infinity;
+    return mm * 6000 + ss * 100 + cs;
+  }
+
+  return Infinity;
+}
+
+// التحقق من صحة صيغة الوقت MM:SS:cs
+export function isValidTime(timeValue) {
+  if (!timeValue || String(timeValue).trim() === "") return false;
+  const str = String(timeValue).trim();
+  // الصيغة: أرقام:أرقام:أرقام
+  if (!/^\d+:\d{2}:\d{2}$/.test(str)) return false;
+  const parts = str.split(":");
+  const ss = parseInt(parts[1], 10);
+  const cs = parseInt(parts[2], 10);
+  return ss <= 59 && cs <= 99;
 }
 
 function shuffleArray(arr) {
@@ -43,7 +66,7 @@ export default function generateBracket(items, isTeam = false) {
         churchName: churchName,
         players: churchGroups[churchName].map((pName) => ({
           name: pName,
-          score: "", // قيمة فارغة مجهزة للعداد الرقمي الجديد
+          score: "",
         })),
         winner: null,
         isRelay: true,
@@ -177,7 +200,7 @@ export function propagateWinners(rounds) {
             p1: p1,
             p2: "BYE",
             score1: isRelay ? "" : 1,
-            score2: isRelay ? "999.99" : 0,
+            score2: isRelay ? "999:99:99" : 0,
             winner: p1,
             isBye: true,
             isRelay: isRelay,
