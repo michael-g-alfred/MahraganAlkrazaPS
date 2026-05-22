@@ -1,3 +1,13 @@
+/**
+ * Players.jsx
+ * ─────────────────────────────────────────────────────────────────
+ * صفحة عرض اللاعبين المسجلين مع إمكانية الفلترة، الحذف، وتصدير Excel.
+ * - تستخدم useFetch لجلب البيانات من Firebase Realtime Database.
+ * - تستخدم XLSX من SheetJS لتصدير البيانات.
+ * - يحق للمستخدم المُصرَّح له فقط (ALLOWED_ACTION) الحذف والتصدير.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
 import React, { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
@@ -5,28 +15,44 @@ import useFetch from "../hooks/useFetch";
 import SelectBox from "../components/SelectBox";
 import Pagination from "../components/Pagination";
 import { useAuth } from "../context/AuthContext";
+// SheetJS تُحمَّل من CDN خارجي — لا تحتاج تثبيت npm
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
+// ─── ثوابت ────────────────────────────────────────────────────────
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
+/** البريد الإلكتروني الوحيد المسموح له بالحذف والتصدير */
 const ALLOWED_ACTION = "michoolgeorge@gmail.com";
+/** عدد العناصر في كل صفحة */
 const ITEMS_PER_PAGE = 20;
 
+// ─── مساعدات الأفاتار ──────────────────────────────────────────────
+
+/**
+ * يستخرج الحرف الأول من الاسم الأول للاعب لعرضه كـ Avatar.
+ * @param {string} name - اسم اللاعب الكامل
+ * @returns {string} حرف واحد أو "؟" إذا كان الاسم فارغاً
+ */
 function getInitials(name = "") {
   const parts = name.trim().split(" ").filter(Boolean);
   if (parts.length === 0) return "؟";
-  if (parts.length === 1) return parts[0][0];
   return parts[0][0];
 }
 
+/** ألوان خلفية ونص للأفاتار — تتناوب بناءً على الاسم */
 const AVATAR_COLORS = [
-  { bg: "#dbeafe", text: "#1e40af" },
-  { bg: "#dcfce7", text: "#166534" },
-  { bg: "#fce7f3", text: "#9d174d" },
-  { bg: "#fef9c3", text: "#854d0e" },
-  { bg: "#ede9fe", text: "#5b21b6" },
-  { bg: "#ffedd5", text: "#9a3412" },
+  { bg: "#dbeafe", text: "#1e40af" }, // أزرق
+  { bg: "#dcfce7", text: "#166534" }, // أخضر
+  { bg: "#fce7f3", text: "#9d174d" }, // وردي
+  { bg: "#fef9c3", text: "#854d0e" }, // أصفر
+  { bg: "#ede9fe", text: "#5b21b6" }, // بنفسجي
+  { bg: "#ffedd5", text: "#9a3412" }, // برتقالي
 ];
 
+/**
+ * يختار لون أفاتار محدد بناءً على hash الاسم لضمان ثبات اللون.
+ * @param {string} name - اسم اللاعب
+ * @returns {{ bg: string, text: string }}
+ */
 function avatarColor(name = "") {
   let hash = 0;
   for (let i = 0; i < name.length; i++)
@@ -34,6 +60,12 @@ function avatarColor(name = "") {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+// ─── مكونات الشارات (Badges) ──────────────────────────────────────
+
+/**
+ * شارة نوع اللاعب (بنين / بنات).
+ * تستخدم ألوانًا مختلفة لكل حالة.
+ */
 function GenderBadge({ gender }) {
   if (gender === "بنين")
     return (
@@ -50,10 +82,14 @@ function GenderBadge({ gender }) {
   );
 }
 
+/**
+ * شارة نوع الاستمارة (فردي / جماعي).
+ * اللون الأخضر للجماعي، الأصفر للفردي.
+ */
 function FormBadge({ form }) {
   if (form === "جماعى")
     return (
-      <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-800 font-medium whitespace-nowrap">
+      <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-medium whitespace-nowrap">
         جماعى
       </span>
     );
@@ -64,51 +100,73 @@ function FormBadge({ form }) {
   );
 }
 
+// ─── مكون كارت اللاعب ─────────────────────────────────────────────
+
+/**
+ * كارت لاعب واحد قابل للتوسيع (Accordion).
+ * - يعرض الاسم والرقم القومي والشارات في الوضع المطوي.
+ * - يعرض كل التفاصيل + زر الحذف عند التوسيع.
+ *
+ * @param {object}   player    - بيانات اللاعب من Firebase
+ * @param {number}   index     - رقم اللاعب في القائمة الحالية
+ * @param {boolean}  canAction - هل المستخدم مسموح له بالحذف؟
+ * @param {Function} onDelete  - دالة الحذف تُستدعى بكائن اللاعب
+ */
 function PlayerCard({ player, index, canAction, onDelete }) {
+  // حالة التوسيع / الطي
   const [expanded, setExpanded] = useState(false);
+
   const color = avatarColor(player.name);
   const initials = getInitials(player.name);
 
   return (
     <div
-      className={`bg-slate-100/50 border border-slate-400/50 rounded-2xl overflow-hidden transition-all ${
-        expanded ? "border-blue-200" : "border-slate-100"
+      className={`bg-white border rounded-2xl overflow-hidden transition-all duration-200 ${
+        expanded ? "border-blue-300 shadow-sm border-2" : "border-slate-200"
       }`}>
+      {/* ── رأس الكارت القابل للنقر ── */}
       <div
-        className="flex items-center gap-3 px-3 py-3 cursor-pointer select-none"
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded((v) => !v)}
         role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`تفاصيل ${player.name}`}>
-        <span className="text-xs text-slate-400 w-5 text-center flex-shrink-0 font-bold font-mono">
+        {/* رقم الترتيب */}
+        <span className="text-xs text-slate-400 w-6 text-center flex-shrink-0 font-mono font-bold">
           {index + 1}
         </span>
 
+        {/* أفاتار بالحرف الأول */}
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0"
-          style={{ background: color.bg, color: color.text }}>
+          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+          style={{ background: color.bg, color: color.text }}
+          aria-hidden="true">
           {initials}
         </div>
 
-        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-          <p className="text-sm font-semibold text-slate-900 truncate">
+        {/* الاسم + الرقم القومي */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-900 truncate leading-tight">
             {player.name}
           </p>
           <p
-            className="text-xs font-mono text-slate-400 truncate"
-            dir="ltr"
-            style={{ textAlign: "right" }}>
+            className="text-sm font-bold font-mono text-rose-700 truncate mt-0.5"
+            dir="rtl">
             {player.nationalId || "—"}
           </p>
         </div>
 
-        <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+        {/* الشارات (تظهر فقط على الشاشات المتوسطة فما فوق) */}
+        <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
           <GenderBadge gender={player.gender} />
           <FormBadge form={player.form} />
         </div>
 
+        {/* أيقونة السهم — تدور عند التوسيع */}
         <svg
-          className={`w-5 h-5 text-slate-400 flex-shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -122,14 +180,17 @@ function PlayerCard({ player, index, canAction, onDelete }) {
         </svg>
       </div>
 
+      {/* ── تفاصيل اللاعب (تظهر عند التوسيع) ── */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-slate-100">
-          <div className="flex md:hidden items-center gap-2 pt-3 pb-1">
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 pb-4 pt-3">
+          {/* الشارات على الشاشات الصغيرة */}
+          <div className="flex sm:hidden items-center gap-2 mb-3">
             <GenderBadge gender={player.gender} />
             <FormBadge form={player.form} />
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-2 text-xs">
+          {/* شبكة التفاصيل — عمودان */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
             <DetailItem label="المرحلة">{player.stage || "—"}</DetailItem>
             <DetailItem label="تاريخ الميلاد">
               {player.birthdate || "—"}
@@ -138,24 +199,32 @@ function PlayerCard({ player, index, canAction, onDelete }) {
             <DetailItem label="التليفون">
               <span className="font-mono">{player.phone || "—"}</span>
             </DetailItem>
-            <DetailItem label="الكنيسة">{player.church || "—"}</DetailItem>
-            <DetailItem label="الفريق">
-              {player.team ?
-                <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 rounded-full px-2.5 py-0.5 text-xs font-medium">
+            <DetailItem label="الكنيسة" className="col-span-2">
+              {player.church || "—"}
+            </DetailItem>
+            {/* اسم الفريق — يظهر فقط إذا كان موجوداً */}
+            {player.team && (
+              <DetailItem label="الفريق">
+                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2.5 py-0.5 font-medium">
                   {player.team}
                 </span>
-              : <span className="text-slate-400">—</span>}
-            </DetailItem>
+              </DetailItem>
+            )}
           </div>
 
+          {/* زر الحذف — يظهر فقط للمستخدم المُصرَّح له */}
           {canAction && (
             <button
               onClick={(e) => {
+                // نمنع الحدث من الوصول للـ div الأب (الذي يطوي الكارت)
                 e.stopPropagation();
                 onDelete(player);
               }}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-red-600 bg-red-100 border border-red-700 text-xs font-medium hover:bg-red-700 hover:text-white transition"
+              className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                         text-red-600 bg-red-50 border border-red-200 text-xs font-semibold
+                         hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200"
               aria-label={`حذف اللاعب ${player.name}`}>
+              {/* أيقونة سلة المهملات */}
               <svg
                 className="w-4 h-4"
                 fill="none"
@@ -177,28 +246,41 @@ function PlayerCard({ player, index, canAction, onDelete }) {
   );
 }
 
+/**
+ * عنصر تفصيلة واحدة داخل الكارت المفتوح.
+ * @param {string} label    - التسمية (مثال: "المرحلة")
+ * @param {node}   children - القيمة المعروضة
+ */
 function DetailItem({ label, children }) {
   return (
     <div>
-      <p className="text-slate-400 mb-0.5">{label}</p>
-      <div className="text-slate-900 font-medium">{children}</div>
+      <p className="text-blue-700 mb-0.5 text-sm font-medium">{label}</p>
+      <div className="text-slate-700 font-black text-xs">{children}</div>
     </div>
   );
 }
 
+// ─── المكون الرئيسي ────────────────────────────────────────────────
+
 export default function Players() {
+  // جلب بيانات المستخدم المُسجَّل دخوله
   const { user } = useAuth();
+  // هل المستخدم الحالي مسموح له بالحذف والتصدير؟
   const canAction = user?.email?.toLowerCase() === ALLOWED_ACTION;
 
+  // جلب اللاعبين من Firebase
   const [loadingFetch, errorFetch, players] = useFetch();
+
+  // نسخة محلية من اللاعبين تتيح التحديث الفوري بدون إعادة جلب
   const [localPlayers, setLocalPlayers] = useState([]);
+
+  // حالة عملية "حذف الكل" (لمنع النقر المزدوج)
   const [deletingAll, setDeletingAll] = useState(false);
+
+  // الصفحة الحالية في pagination
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    setLocalPlayers(players);
-  }, [players]);
-
+  // حالة الفلاتر — جميعها مبدئيًا فارغة (أي "الكل")
   const [filter, setFilter] = useState({
     gender: "",
     game: "",
@@ -208,13 +290,42 @@ export default function Players() {
     team: "",
   });
 
+  // مزامنة النسخة المحلية مع البيانات المجلوبة
+  useEffect(() => {
+    setLocalPlayers(players);
+  }, [players]);
+
+  /** هل تم تطبيق أي فلتر؟ (لتفعيل زر "مسح الفلاتر") */
   const isFiltered = Object.values(filter).some(Boolean);
 
+  /**
+   * يُحدِّث قيمة فلتر معين ويُعيد الترقيم لأول صفحة.
+   * @param {string} key   - مفتاح الفلتر (مثال: "gender")
+   * @param {string} value - القيمة الجديدة
+   */
   const handleFilterChange = (key, value) => {
     setFilter((prev) => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   };
 
+  /**
+   * يُعيد تعيين جميع الفلاتر للقيم الافتراضية الفارغة.
+   */
+  const resetFilters = () => {
+    setFilter({
+      gender: "",
+      game: "",
+      form: "",
+      stage: "",
+      church: "",
+      team: "",
+    });
+    setCurrentPage(1);
+  };
+
+  // ── حساب البيانات المعروضة ────────────────────────────────────
+
+  /** اللاعبون بعد تطبيق جميع الفلاتر المحددة */
   const filteredPlayers = useMemo(
     () =>
       localPlayers.filter((p) => {
@@ -229,58 +340,89 @@ export default function Players() {
     [localPlayers, filter],
   );
 
+  /** إجمالي عدد الصفحات */
   const totalPages = Math.ceil(filteredPlayers.length / ITEMS_PER_PAGE);
 
+  /** اللاعبون في الصفحة الحالية فقط */
   const paginatedPlayers = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredPlayers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredPlayers, currentPage]);
 
+  // ── خيارات الفلاتر (مشتقة من البيانات الفعلية) ────────────────
+
+  /** قائمة الأنواع المتاحة (بنين / بنات) */
   const genders = useMemo(
     () => [...new Set(localPlayers.map((p) => p.gender).filter(Boolean))],
     [localPlayers],
   );
+  /** قائمة الألعاب المتاحة */
   const games = useMemo(
     () => [...new Set(localPlayers.map((p) => p.game).filter(Boolean))],
     [localPlayers],
   );
+  /** قائمة المراحل المتاحة */
   const stages = useMemo(
     () => [...new Set(localPlayers.map((p) => p.stage).filter(Boolean))],
     [localPlayers],
   );
+  /** قائمة الكنائس المتاحة */
   const churches = useMemo(
     () => [...new Set(localPlayers.map((p) => p.church).filter(Boolean))],
     [localPlayers],
   );
+  /** قائمة نوعي الاستمارة (فردي / جماعي) */
   const forms = useMemo(
     () => [...new Set(localPlayers.map((p) => p.form).filter(Boolean))],
     [localPlayers],
   );
+  /** قائمة أسماء الفرق المتاحة */
   const teams = useMemo(
     () => [...new Set(localPlayers.map((p) => p.team).filter(Boolean))],
     [localPlayers],
   );
 
+  // ── دوال الأكشن ───────────────────────────────────────────────
+
+  /**
+   * يحذف لاعبًا واحدًا.
+   * - يُحدِّث الواجهة فورًا (Optimistic UI).
+   * - يرسل طلب DELETE لـ Firebase.
+   * - يُعيد البيانات إذا فشل الطلب.
+   *
+   * @param {object} player - بيانات اللاعب المراد حذفه
+   */
   function handleDeleteItem(player) {
     if (!window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) return;
-    const prev = [...localPlayers];
-    setLocalPlayers((p) => p.filter((x) => x.id !== player.id));
 
+    // حفظ نسخة احتياطية للرجوع إليها عند الفشل
+    const backup = [...localPlayers];
+
+    // حذف فوري من الواجهة
+    setLocalPlayers((prev) => prev.filter((x) => x.id !== player.id));
+
+    // إذا أصبحت الصفحة فارغة، انتقل للصفحة السابقة
     if (paginatedPlayers.length === 1 && currentPage > 1) {
       setCurrentPage((prev) => prev - 1);
     }
 
+    // طلب الحذف من Firebase
     fetch(`${BASE_URL}/players/${player.id}.json`, { method: "DELETE" })
       .then((res) => {
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error("Delete failed");
         toast.success("تم حذف اللاعب ✅");
       })
       .catch(() => {
-        setLocalPlayers(prev);
+        // فشل الحذف — استعادة البيانات
+        setLocalPlayers(backup);
         toast.error("فشل الحذف ❌");
       });
   }
 
+  /**
+   * يحذف جميع اللاعبين دفعة واحدة.
+   * يستخدم DELETE على العقدة الجذرية /players.json في Firebase.
+   */
   async function handleDeleteAll() {
     if (
       !window.confirm(
@@ -288,23 +430,30 @@ export default function Players() {
       )
     )
       return;
+
     setDeletingAll(true);
-    const prev = [...localPlayers];
+    const backup = [...localPlayers];
     setLocalPlayers([]);
     setCurrentPage(1);
+
     try {
       const res = await fetch(`${BASE_URL}/players.json`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error("Delete all failed");
       toast.success("تم حذف جميع اللاعبين 🗑️");
     } catch {
-      setLocalPlayers(prev);
+      setLocalPlayers(backup);
       toast.error("فشل الحذف ❌");
     } finally {
       setDeletingAll(false);
     }
   }
 
+  /**
+   * يُصدِّر اللاعبين المعروضين حاليًا (بعد الفلترة) كملف Excel.
+   * يستخدم مكتبة SheetJS لإنشاء الملف وتحميله.
+   */
   function handleExportExcel() {
+    // تحويل بيانات اللاعبين لصفوف Excel بعناوين عربية
     const rows = filteredPlayers.map((p, i) => ({
       "#": i + 1,
       الاسم: p.name,
@@ -318,6 +467,8 @@ export default function Players() {
       الإستمارة: p.form,
       "اسم الفريق": p.team || "",
     }));
+
+    // إنشاء ورقة العمل وضبط عروض الأعمدة
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
       { wch: 5 },
@@ -332,6 +483,8 @@ export default function Players() {
       { wch: 12 },
       { wch: 20 },
     ];
+
+    // إنشاء الملف وتحميله
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "اللاعبين");
     const fileName = `اللاعبين_${new Date().toLocaleDateString("ar-EG").replace(/\//g, "-")}.xlsx`;
@@ -339,9 +492,11 @@ export default function Players() {
     toast.success("تم تحميل Excel ✅");
   }
 
+  // ── حالات التحميل والخطأ والبيانات الفارغة ─────────────────────
+
   if (loadingFetch) {
     return (
-      <div className="flex justify-center items-center py-20" role="status">
+      <div className="flex justify-center items-center py-24" role="status">
         <Loader />
       </div>
     );
@@ -349,17 +504,20 @@ export default function Players() {
 
   if (errorFetch) {
     return (
-      <div role="alert" className="text-red-500 text-center py-16 font-medium">
-        {errorFetch}
+      <div
+        role="alert"
+        className="flex flex-col items-center gap-3 py-20 text-center">
+        <span className="text-4xl">⚠️</span>
+        <p className="text-red-500 font-semibold">{errorFetch}</p>
       </div>
     );
   }
 
   if (localPlayers.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
+      <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
         <svg
-          className="w-12 h-12 text-slate-300"
+          className="w-16 h-16 text-slate-200"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -370,67 +528,166 @@ export default function Players() {
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
           />
         </svg>
-        <p className="text-lg font-medium">لا يوجد لاعبين مسجلين بعد</p>
+        <p className="text-lg font-semibold text-slate-500">
+          لا يوجد لاعبين مسجلين بعد
+        </p>
+        <p className="text-sm">ابدأ بتسجيل اللاعبين من الصفحة الرئيسية</p>
       </div>
     );
   }
 
+  // ── الواجهة الرئيسية ──────────────────────────────────────────
+
   return (
-    <div className="min-h-screen" dir="rtl">
-      {/* الفلتر */}
-      <div className="flex flex-wrap justify-center gap-3 mb-4" role="search">
-        <SelectBox
-          label="كل الأنواع"
-          value={filter.gender}
-          onChange={(e) => handleFilterChange("gender", e.target.value)}
-          options={genders}
-        />
-        <SelectBox
-          label="كل المراحل"
-          value={filter.stage}
-          onChange={(e) => handleFilterChange("stage", e.target.value)}
-          options={stages}
-        />
-        <SelectBox
-          label="كل الألعاب"
-          value={filter.game}
-          onChange={(e) => handleFilterChange("game", e.target.value)}
-          options={games}
-        />
-        <SelectBox
-          label="كل الكنائس"
-          value={filter.church}
-          onChange={(e) => handleFilterChange("church", e.target.value)}
-          options={churches}
-        />
-        <SelectBox
-          label="كل الإستمارات"
-          value={filter.form}
-          onChange={(e) => handleFilterChange("form", e.target.value)}
-          options={forms}
-        />
-        <SelectBox
-          label="كل الفرق"
-          value={filter.team}
-          onChange={(e) => handleFilterChange("team", e.target.value)}
-          options={teams}
-        />
-        <button
-          onClick={() => {
-            setFilter({
-              gender: "",
-              game: "",
-              form: "",
-              stage: "",
-              church: "",
-              team: "",
-            });
-            setCurrentPage(1);
-          }}
-          disabled={!isFiltered}
-          className={`${isFiltered ? "bg-blue-700 hover:bg-blue-800 text-white cursor-pointer" : "bg-slate-300 cursor-not-allowed text-slate-400"} px-4 py-2 rounded-lg transition`}>
+    <div className="min-h-screen max-w-3xl mx-auto" dir="rtl">
+      {/* ═══ شريط الفلاتر ═══════════════════════════════════════ */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
+        <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">
+          فلترة النتائج
+        </p>
+        <div className="flex flex-wrap gap-2" role="search">
+          <SelectBox
+            label="النوع"
+            value={filter.gender}
+            onChange={(e) => handleFilterChange("gender", e.target.value)}
+            options={genders}
+          />
+          <SelectBox
+            label="المرحلة"
+            value={filter.stage}
+            onChange={(e) => handleFilterChange("stage", e.target.value)}
+            options={stages}
+          />
+          <SelectBox
+            label="اللعبة"
+            value={filter.game}
+            onChange={(e) => handleFilterChange("game", e.target.value)}
+            options={games}
+          />
+          <SelectBox
+            label="الكنيسة"
+            value={filter.church}
+            onChange={(e) => handleFilterChange("church", e.target.value)}
+            options={churches}
+          />
+          <SelectBox
+            label="الإستمارة"
+            value={filter.form}
+            onChange={(e) => handleFilterChange("form", e.target.value)}
+            options={forms}
+          />
+          <SelectBox
+            label="الفريق"
+            value={filter.team}
+            onChange={(e) => handleFilterChange("team", e.target.value)}
+            options={teams}
+          />
+
+          {/* زر مسح الفلاتر — يُفعَّل فقط عند وجود فلتر مُطبَّق */}
+          <button
+            onClick={resetFilters}
+            disabled={!isFiltered}
+            title="مسح جميع الفلاتر"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
+              isFiltered ?
+                "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+              : "bg-slate-100 text-slate-300 cursor-not-allowed"
+            }`}>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+            مسح
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ شريط الإحصاء والأزرار ══════════════════════════════ */}
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4 px-1">
+        {/* عداد النتائج */}
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-700 inline-block"></span>
+          <p
+            className="text-sm font-semibold text-slate-700"
+            aria-live="polite">
+            {filteredPlayers.length} لاعب
+            {isFiltered && (
+              <span className="text-slate-400 font-normal">
+                {" "}
+                من {localPlayers.length}
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* أزرار الأكشن (مرئية للمسؤول فقط) */}
+        {canAction && (
+          <div className="flex items-center gap-2">
+            {/* تصدير Excel */}
+            <button
+              onClick={handleExportExcel}
+              disabled={filteredPlayers.length === 0}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
+                filteredPlayers.length === 0 ?
+                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
+              }`}>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Excel
+            </button>
+
+            {/* حذف الكل */}
+            <button
+              onClick={handleDeleteAll}
+              disabled={deletingAll || localPlayers.length === 0}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
+                deletingAll || localPlayers.length === 0 ?
+                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+              }`}>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              {deletingAll ? "جاري الحذف..." : "مسح الكل"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ قائمة اللاعبين ══════════════════════════════════════ */}
+      {filteredPlayers.length === 0 ?
+        // حالة عدم وجود نتائج للفلتر المطبَّق
+        <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
           <svg
-            className="w-5 h-5"
+            className="w-10 h-10 text-slate-200"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -438,70 +695,14 @@ export default function Players() {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M8 4H20v2.172a2 2 0 01-.586 1.414l-4.5 4.5M15 15v4l-6 2v-7.5L4.52 7.572A2 2 0 014 6.227V4M3 3l18 18"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-        </button>
-      </div>
-
-      {/* عداد + أزرار الأكشن */}
-      <div
-        className="flex flex-wrap justify-center items-center gap-3 mb-4"
-        aria-live="polite">
-        <p className="text-blue-700 font-bold text-lg">
-          عدد اللاعبين: {filteredPlayers.length}
-        </p>
-
-        {canAction && (
-          <button
-            onClick={handleExportExcel}
-            disabled={filteredPlayers.length === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${filteredPlayers.length === 0 ? "bg-slate-300 text-slate-400 cursor-not-allowed" : "text-green-600 bg-green-100 border border-green-700 text-xs font-medium hover:bg-green-700 hover:text-white cursor-pointer"}`}>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            تحميل Excel
-          </button>
-        )}
-
-        {canAction && (
-          <button
-            onClick={handleDeleteAll}
-            disabled={deletingAll || localPlayers.length === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${deletingAll || localPlayers.length === 0 ? "bg-slate-300 text-slate-400 cursor-not-allowed" : "text-red-600 bg-red-100 border border-red-700 text-xs font-medium hover:bg-red-700 hover:text-white transition cursor-pointer"}`}>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            {deletingAll ? "جاري الحذف..." : "مسح الكل"}
-          </button>
-        )}
-      </div>
-
-      {/* قائمة الكروت */}
-      {filteredPlayers.length === 0 ?
-        <div className="text-center py-16 text-slate-400">
-          <p className="text-base font-medium">لا توجد نتائج</p>
-          <p className="text-sm mt-1">حاول تغيير الفلتر</p>
+          <p className="font-semibold text-slate-500">لا توجد نتائج</p>
+          <p className="text-sm">حاول تغيير الفلتر أو مسحه</p>
         </div>
       : <>
+          {/* كروت اللاعبين — كل كارت قابل للتوسيع */}
           <div className="flex flex-col gap-2 pb-4">
             {paginatedPlayers.map((player, index) => (
               <PlayerCard
@@ -514,6 +715,7 @@ export default function Players() {
             ))}
           </div>
 
+          {/* شريط التنقل بين الصفحات */}
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}

@@ -79,11 +79,11 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-7xl mx-auto">
               {stages
                 .filter((stage) =>
-                  selection.game.name === "جرى تتابع"
-                    ? stage.name === "المرحلة الأولى (أ)" ||
-                      stage.name === "المرحلة الأولى (ب)"
-                    : stage.name !== "المرحلة الأولى (أ)" &&
-                      stage.name !== "المرحلة الأولى (ب)"
+                  selection.game.name === "جرى تتابع" ?
+                    stage.name === "المرحلة الأولى (أ)" ||
+                    stage.name === "المرحلة الأولى (ب)"
+                  : stage.name !== "المرحلة الأولى (أ)" &&
+                    stage.name !== "المرحلة الأولى (ب)",
                 )
                 .map((stage, i) => (
                   <SelectCard
@@ -133,13 +133,15 @@ export default function Home() {
           <div className="mb-12">
             <StepHeader step={5} title="اختر نوع الإستمارة" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-7xl mx-auto">
-              {(selection.game &&
-              (selection.game.name === "كرة قدم" ||
-                selection.game.name === "كرة الطائرة")
-                ? forms.filter((f) => f.name === "جماعى")
-                : selection.game.name === "جرى تتابع"
-                ? forms.filter((f) => f.name === "فردى")
-                : forms
+              {((
+                selection.game &&
+                (selection.game.name === "كرة قدم" ||
+                  selection.game.name === "كرة الطائرة")
+              ) ?
+                forms.filter((f) => f.name === "جماعى")
+              : selection.game.name === "جرى تتابع" ?
+                forms.filter((f) => f.name === "فردى")
+              : forms
               ).map((f, i) => (
                 <SelectCard
                   key={i}
