@@ -3,6 +3,18 @@ import stages from "../data/stages";
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 
 /**
+ * التحقق من أن الاسم رباعي (٤ كلمات عربية)
+ */
+export function validateQuadName(name) {
+  if (!name?.trim()) return null;
+  const regex = /^[\u0600-\u06FF]+([ ][\u0600-\u06FF]+){3}$/;
+  if (!regex.test(name.trim())) {
+    return "الإسم يجب أن يكون رباعياً";
+  }
+  return null;
+}
+
+/**
  * التحقق من تاريخ الميلاد مع المرحلة
  */
 export function validateBirthdate(birthdate, stageName) {

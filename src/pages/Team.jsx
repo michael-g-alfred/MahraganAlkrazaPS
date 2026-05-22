@@ -3,7 +3,11 @@ import usePlayerSave from "../hooks/usePlayerSave";
 import Card from "../components/Card";
 import Loader from "../components/Loader";
 import useFetch from "../hooks/useFetch";
-import { validateBirthdate, validateNameUnique } from "../utils/validatePlayer";
+import {
+  validateBirthdate,
+  validateNameUnique,
+  validateQuadName,
+} from "../utils/validatePlayer";
 
 export default function Team({ data, onUpdateSelection }) {
   const { loading, saveTeam } = usePlayerSave(data, onUpdateSelection);
@@ -13,7 +17,7 @@ export default function Team({ data, onUpdateSelection }) {
 
   const [playerErrors, setPlayerErrors] = useState([]);
   const [checkingNames, setCheckingNames] = useState([]);
-  const [nationalIdValids, setNationalIdValids] = useState([]); // ← جديد
+  const [nationalIdValids, setNationalIdValids] = useState([]);
 
   const [loadingFetch, errorFetch, playersData] = useFetch();
 
@@ -23,7 +27,8 @@ export default function Team({ data, onUpdateSelection }) {
   );
 
   const parsedCount = parseInt(playerCount, 10);
-  const countIsValid = !isNaN(parsedCount) && parsedCount >= 2 && parsedCount <= 12;
+  const countIsValid =
+    !isNaN(parsedCount) && parsedCount >= 2 && parsedCount <= 12;
 
   useEffect(() => {
     setPlayers([]);
@@ -40,14 +45,18 @@ export default function Team({ data, onUpdateSelection }) {
       nationalId: "",
     }));
     setPlayers(newPlayers);
-    setPlayerErrors(Array(parsedCount).fill({ birthdate: null, name: null }));
+    setPlayerErrors(
+      Array(parsedCount).fill({ birthdate: null, name: null })
+    );
     setCheckingNames(Array(parsedCount).fill(false));
     setNationalIdValids(Array(parsedCount).fill(false));
   };
 
   const handlePlayerChange = (index, field, value) => {
     setPlayers((prev) =>
-      prev.map((player, i) => (i === index ? { ...player, [field]: value } : player))
+      prev.map((player, i) =>
+        i === index ? { ...player, [field]: value } : player
+      )
     );
 
     if (field === "birthdate" && data?.stage?.name) {
@@ -58,25 +67,41 @@ export default function Team({ data, onUpdateSelection }) {
     }
 
     if (field === "name") {
-      setCheckingNames((prev) => prev.map((c, i) => (i === index ? true : c)));
+      // التحقق الفوري من الاسم الرباعي
+      const quadError = validateQuadName(value);
+      if (quadError) {
+        setPlayerErrors((prev) =>
+          prev.map((e, i) => (i === index ? { ...e, name: quadError } : e))
+        );
+        setCheckingNames((prev) => prev.map((c, i) => (i === index ? false : c)));
+        return;
+      }
+
+      // لو رباعي صح → نتحقق من التكرار
+      setCheckingNames((prev) =>
+        prev.map((c, i) => (i === index ? true : c))
+      );
       clearTimeout(window[`nameTimer_${index}`]);
       window[`nameTimer_${index}`] = setTimeout(async () => {
         const error = await validateNameUnique(value, data);
         setPlayerErrors((prev) =>
           prev.map((e, i) => (i === index ? { ...e, name: error } : e))
         );
-        setCheckingNames((prev) => prev.map((c, i) => (i === index ? false : c)));
+        setCheckingNames((prev) =>
+          prev.map((c, i) => (i === index ? false : c))
+        );
       }, 600);
     }
   };
 
   const handleNationalIdChange = (index, val) => {
     setPlayers((prev) =>
-      prev.map((player, i) => (i === index ? { ...player, nationalId: val } : player))
+      prev.map((player, i) =>
+        i === index ? { ...player, nationalId: val } : player
+      )
     );
   };
 
-  // callback من NationalIdInput لكل لاعب
   const handleNationalIdValidation = (index, isValid) => {
     setNationalIdValids((prev) =>
       prev.map((v, i) => (i === index ? isValid : v))
@@ -87,23 +112,31 @@ export default function Team({ data, onUpdateSelection }) {
     playerErrors.some((e) => e?.birthdate || e?.name) ||
     checkingNames.some(Boolean);
 
-  const allNationalIdsValid = nationalIdValids.length > 0 && nationalIdValids.every(Boolean);
+  const allNationalIdsValid =
+    nationalIdValids.length > 0 && nationalIdValids.every(Boolean);
 
   const isTeamValid =
     teamName.trim() &&
     !teamsArr.includes(teamName.trim()) &&
     players.length >= 2 &&
-    players.every((p) => p.name?.trim() && p.phone?.trim() && p.birthdate) &&
-    allNationalIdsValid &&   // ← كل الأرقام القومية صحيحة ومتاحة
+    players.every(
+      (p) => p.name?.trim() && p.phone?.trim() && p.birthdate
+    ) &&
+    allNationalIdsValid &&
     !hasAnyError &&
     !loading;
 
   const handleSave = async () => {
+    // التحقق النهائي قبل الحفظ
     const finalErrors = await Promise.all(
-      players.map(async (p) => ({
-        birthdate: validateBirthdate(p.birthdate, data?.stage?.name),
-        name: await validateNameUnique(p.name, data),
-      }))
+      players.map(async (p) => {
+        const quadErr = validateQuadName(p.name);
+        if (quadErr) return { birthdate: validateBirthdate(p.birthdate, data?.stage?.name), name: quadErr };
+        return {
+          birthdate: validateBirthdate(p.birthdate, data?.stage?.name),
+          name: await validateNameUnique(p.name, data),
+        };
+      })
     );
     setPlayerErrors(finalErrors);
     if (finalErrors.some((e) => e.birthdate || e.name)) return;
@@ -131,7 +164,9 @@ export default function Team({ data, onUpdateSelection }) {
           {loadingFetch ? (
             <Loader size={4} />
           ) : errorFetch ? (
-            <p role="alert" className="text-red-500 text-sm">{errorFetch}</p>
+            <p role="alert" className="text-red-500 text-sm">
+              {errorFetch}
+            </p>
           ) : (
             teamsArr.length > 0 && (
               <p className="text-gray-500 italic text-sm">
@@ -157,7 +192,10 @@ export default function Team({ data, onUpdateSelection }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="playerCount" className="text-blue-700 font-semibold">
+          <label
+            htmlFor="playerCount"
+            className="text-blue-700 font-semibold"
+          >
             عدد اللاعبين بالفريق (من 2 إلى 12)
           </label>
           <input
@@ -203,23 +241,37 @@ export default function Team({ data, onUpdateSelection }) {
                 handleInputChange={(e) =>
                   handlePlayerChange(index, e.target.name, e.target.value)
                 }
-                handleNationalIdChange={(val) => handleNationalIdChange(index, val)}
-                onNationalIdValidation={(isValid) => handleNationalIdValidation(index, isValid)}
+                handleNationalIdChange={(val) =>
+                  handleNationalIdChange(index, val)
+                }
+                onNationalIdValidation={(isValid) =>
+                  handleNationalIdValidation(index, isValid)
+                }
               />
 
-              {playerErrors[index]?.name && (
-                <div role="alert" className="mt-2 flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3">
-                  <span>⚠️</span>
-                  <span>{playerErrors[index].name}</span>
-                </div>
-              )}
+              {/* رسالة خطأ الاسم (التكرار فقط — الرباعي بيظهر داخل Input) */}
+              {playerErrors[index]?.name &&
+                !validateQuadName(player.name) && (
+                  <div
+                    role="alert"
+                    className="mt-2 flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3"
+                  >
+                    <span>⚠️</span>
+                    <span>{playerErrors[index].name}</span>
+                  </div>
+                )}
+
               {checkingNames[index] && (
                 <p className="mt-1 text-blue-500 text-sm text-center animate-pulse">
                   جارٍ التحقق من الاسم...
                 </p>
               )}
+
               {playerErrors[index]?.birthdate && (
-                <div role="alert" className="mt-2 flex items-center gap-2 bg-orange-50 border border-orange-300 text-orange-700 text-sm rounded-xl px-4 py-3">
+                <div
+                  role="alert"
+                  className="mt-2 flex items-center gap-2 bg-orange-50 border border-orange-300 text-orange-700 text-sm rounded-xl px-4 py-3"
+                >
                   <span>📅</span>
                   <span>{playerErrors[index].birthdate}</span>
                 </div>

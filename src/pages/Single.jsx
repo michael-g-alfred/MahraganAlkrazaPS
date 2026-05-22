@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import usePlayerSave from "../hooks/usePlayerSave";
 import Card from "../components/Card";
-import { validateBirthdate, validateNameUnique } from "../utils/validatePlayer";
+import {
+  validateBirthdate,
+  validateNameUnique,
+  validateQuadName,
+} from "../utils/validatePlayer";
 
 export default function Single({ data, onUpdateSelection }) {
   const { loading, savePlayer } = usePlayerSave(data, onUpdateSelection);
@@ -16,7 +20,7 @@ export default function Single({ data, onUpdateSelection }) {
   const [birthdateError, setBirthdateError] = useState(null);
   const [nameError, setNameError] = useState(null);
   const [checkingName, setCheckingName] = useState(false);
-  const [nationalIdValid, setNationalIdValid] = useState(false); // ← جديد
+  const [nationalIdValid, setNationalIdValid] = useState(false);
 
   // ── التحقق من تاريخ الميلاد ──
   useEffect(() => {
@@ -27,12 +31,21 @@ export default function Single({ data, onUpdateSelection }) {
     }
   }, [formData.birthdate, data?.stage?.name]);
 
-  // ── التحقق من تكرار الاسم (debounce 600ms) ──
+  // ── التحقق من الاسم: رباعي أولاً، ثم تكرار (debounce 600ms) ──
   useEffect(() => {
     if (!formData.name.trim()) {
       setNameError(null);
       return;
     }
+
+    // التحقق الفوري من الاسم الرباعي
+    const quadError = validateQuadName(formData.name);
+    if (quadError) {
+      setNameError(quadError);
+      return;
+    }
+
+    // لو الاسم رباعي صح → نتحقق من التكرار
     const timer = setTimeout(async () => {
       setCheckingName(true);
       setNameError(await validateNameUnique(formData.name, data));
@@ -57,17 +70,29 @@ export default function Single({ data, onUpdateSelection }) {
     !birthdateError &&
     !nameError &&
     !checkingName &&
-    nationalIdValid &&   // ← الرقم القومى مكتمل + مش متكرر + مش بيتحقق
+    nationalIdValid &&
     !loading;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const quadError = validateQuadName(formData.name);
+    if (quadError) {
+      setNameError(quadError);
+      return;
+    }
+
     const bdError = validateBirthdate(formData.birthdate, data?.stage?.name);
-    if (bdError) { setBirthdateError(bdError); return; }
+    if (bdError) {
+      setBirthdateError(bdError);
+      return;
+    }
 
     const nameErr = await validateNameUnique(formData.name, data);
-    if (nameErr) { setNameError(nameErr); return; }
+    if (nameErr) {
+      setNameError(nameErr);
+      return;
+    }
 
     await savePlayer({
       name: formData.name,
@@ -97,19 +122,28 @@ export default function Single({ data, onUpdateSelection }) {
         onNationalIdValidation={setNationalIdValid}
       />
 
-      {nameError && (
-        <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3">
+      {/* رسالة خطأ الاسم (التكرار فقط — الرباعي بيظهر داخل Input) */}
+      {nameError && !validateQuadName(formData.name) && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 bg-red-50 border border-red-300 text-red-700 text-sm rounded-xl px-4 py-3"
+        >
           <span>⚠️</span>
           <span>{nameError}</span>
         </div>
       )}
+
       {checkingName && (
         <p className="text-blue-500 text-sm text-center animate-pulse">
           جارٍ التحقق من الاسم...
         </p>
       )}
+
       {birthdateError && (
-        <div role="alert" className="flex items-center gap-2 bg-orange-50 border border-orange-300 text-orange-700 text-sm rounded-xl px-4 py-3">
+        <div
+          role="alert"
+          className="flex items-center gap-2 bg-orange-50 border border-orange-300 text-orange-700 text-sm rounded-xl px-4 py-3"
+        >
           <span>📅</span>
           <span>{birthdateError}</span>
         </div>
