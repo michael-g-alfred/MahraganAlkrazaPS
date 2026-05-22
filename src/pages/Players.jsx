@@ -539,7 +539,7 @@ export default function Players() {
   // ── الواجهة الرئيسية ──────────────────────────────────────────
 
   return (
-    <div className="min-h-screen max-w-3xl mx-auto" dir="rtl">
+    <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
       {/* ═══ شريط الفلاتر ═══════════════════════════════════════ */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
         <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">

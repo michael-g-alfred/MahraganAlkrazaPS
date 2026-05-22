@@ -389,7 +389,7 @@ export default function Admin() {
   // ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen max-w-2xl mx-auto" dir="rtl">
+    <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
       {/* ═══ رأس الصفحة ══════════════════════════════════════════ */}
       <div className="flex justify-between items-center bg-blue-700 text-white px-5 py-3.5 rounded-2xl shadow-md mb-5">
         <div className="flex items-center gap-2.5">
