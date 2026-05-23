@@ -10,17 +10,22 @@ async function checkNationalIdUnique(nationalId) {
     if (!res.ok) return null;
     const data = await res.json();
     if (!data) return null;
-    const exists = Object.values(data).some(
-      (p) => p.nationalId === nationalId
-    );
+    const exists = Object.values(data).some((p) => p.nationalId === nationalId);
     return exists ? "هذا الرقم القومى مسجل من قبل" : null;
   } catch {
     return null;
   }
 }
 
-// onValidationChange(isValid: boolean) — بيبعت للـ parent الحالة الحقيقية
-export default function NationalIdInput({ value, onChange, required, onValidationChange }) {
+export default function NationalIdInput({
+  value,
+  onChange,
+  required,
+  onValidationChange,
+  onError,
+  onChecking,
+  onSuccess,
+}) {
   const digits = Array.from({ length: ID_LENGTH }, (_, i) => value?.[i] || "");
 
   const inputRefs = useRef([]);
@@ -31,11 +36,22 @@ export default function NationalIdInput({ value, onChange, required, onValidatio
   const fullId = digits.join("");
   const isComplete = fullId.length === ID_LENGTH && !digits.includes("");
 
+  // ── إبلاغ الـ parent بحالة الـ checking ──
+  useEffect(() => {
+    onChecking?.(checking);
+  }, [checking, onChecking]);
+
+  // ── إبلاغ الـ parent بحالة الـ error ──
+  useEffect(() => {
+    onError?.(error);
+  }, [error, onError]);
+
   // ── كل ما تتغير الحالة → نبلغ الـ parent ──
   useEffect(() => {
     const isValid = isComplete && !checking && !error;
     onValidationChange?.(isValid);
-  }, [isComplete, checking, error, onValidationChange]);
+    onSuccess?.(isValid);
+  }, [isComplete, checking, error, onValidationChange, onSuccess]);
 
   // ── كل ما يكتمل الرقم → نعمل check ──
   useEffect(() => {
@@ -47,7 +63,7 @@ export default function NationalIdInput({ value, onChange, required, onValidatio
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setChecking(true);
-      onValidationChange?.(false); // أثناء الـ check → مش valid
+      onValidationChange?.(false);
       const err = await checkNationalIdUnique(fullId);
       setError(err);
       setChecking(false);
@@ -63,7 +79,7 @@ export default function NationalIdInput({ value, onChange, required, onValidatio
       arr[index] = char;
       onChange(arr.join(""));
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   const handleKeyDown = (e, index) => {
@@ -118,13 +134,17 @@ export default function NationalIdInput({ value, onChange, required, onValidatio
         <span className="text-gray-400 text-xs font-normal me-2">(١٤ رقم)</span>
       </label>
 
-      <div className="flex flex-wrap gap-1.5 justify-start items-center" dir="ltr">
+      <div
+        className="flex flex-wrap gap-1.5 justify-start items-center"
+        dir="ltr">
         {Array.from({ length: ID_LENGTH }, (_, i) => {
           const isGroupStart = i === 1 || i === 7 || i === 10;
           return (
             <React.Fragment key={i}>
               {isGroupStart && (
-                <span className="text-blue-300 font-bold text-lg select-none">-</span>
+                <span className="text-blue-300 font-bold text-lg select-none">
+                  -
+                </span>
               )}
               <input
                 ref={(el) => (inputRefs.current[i] = el)}
@@ -143,13 +163,13 @@ export default function NationalIdInput({ value, onChange, required, onValidatio
                   w-9 h-11 text-center text-lg font-bold rounded-lg border-2 outline-none
                   transition-all duration-150 select-none
                   ${
-                    digits[i]
-                      ? error && isComplete
-                        ? "border-red-400 bg-red-50 text-red-700"
-                        : isComplete && !checking && !error
-                        ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-300 bg-white text-gray-800 hover:border-blue-400"
+                    digits[i] ?
+                      error && isComplete ?
+                        "border-red-400 bg-red-50 text-red-700"
+                      : isComplete && !checking && !error ?
+                        "border-green-500 bg-green-50 text-green-700"
+                      : "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-300 bg-white text-gray-800 hover:border-blue-400"
                   }
                   focus:border-blue-700 focus:bg-blue-50 focus:shadow-[0_0_0_3px_rgba(29,78,216,0.15)]
                   caret-transparent
@@ -160,23 +180,8 @@ export default function NationalIdInput({ value, onChange, required, onValidatio
         })}
       </div>
 
-      <div className="mt-2 min-h-[1.5rem]">
-        {checking && (
-          <p className="text-blue-500 text-sm animate-pulse flex items-center gap-1">
-            <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            جارٍ التحقق...
-          </p>
-        )}
-        {!checking && error && isComplete && (
-          <p role="alert" className="text-red-600 text-sm flex items-center gap-1">
-            <span>⚠️</span> {error}
-          </p>
-        )}
-        {!checking && !error && isComplete && (
-          <p className="text-green-600 text-sm flex items-center gap-1">
-            <span>✅</span> الرقم القومى صحيح ومتاح
-          </p>
-        )}
+      {/* الخانات المتبقية فقط — باقي الرسائل في Card */}
+      <div className="mt-2 min-h-[1rem]">
         {!isComplete && fullId.length > 0 && (
           <p className="text-gray-400 text-xs">
             {ID_LENGTH - fullId.length} خانة متبقية

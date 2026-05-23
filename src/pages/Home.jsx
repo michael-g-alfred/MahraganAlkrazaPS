@@ -18,7 +18,6 @@ import forms from "../data/forms";
 import Single from "../pages/Single";
 import Team from "../pages/Team";
 import SelectCard from "../components/SelectCard";
-import AlertMessage from "../components/AlertMessage";
 
 // أيقونة Tabler لكل لعبة
 const GAME_ICONS = {
@@ -121,30 +120,6 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <Header />
-
-      <div className="space-y-4 p-6 max-w-md">
-        {/* ERROR */}
-        <AlertMessage
-          type="error"
-          message="Something went wrong. Please try again."
-        />
-        {/* WARNING */}
-        <AlertMessage
-          type="warning"
-          message="Your session will expire in 5 minutes."
-        />
-        {/* SUCCESS */}
-        <AlertMessage
-          type="success"
-          message="Your data has been saved successfully."
-        />
-        {/* INFO */}
-        <AlertMessage
-          type="info"
-          message="New updates are available for your account."
-        />
-      </div>
-
       <div className="px-4 pb-16 max-w-4xl mx-auto">
         {/* ═══ الخطوة 1: النوع ════════════════════════════════════ */}
         {currentStep >= 1 && (

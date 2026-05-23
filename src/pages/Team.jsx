@@ -430,44 +430,13 @@ export default function Team({ data, onUpdateSelection }) {
                     onNationalIdValidation={(isValid) =>
                       handleNationalIdValidation(index, isValid)
                     }
+                    nameError={playerErrors[index]?.name}
+                    checkingName={checkingNames[index]}
                   />
 
                   {/* ── رسائل خطأ هذا اللاعب ── */}
 
                   {/* خطأ تكرار الاسم (لا يُعرض إذا كان الخطأ في الصيغة الرباعية) */}
-                  {playerErrors[index]?.name &&
-                    !validateQuadName(player.name) && (
-                      <div
-                        role="alert"
-                        className="mt-3 flex items-start gap-2.5 bg-red-50 border border-red-200
-                                 text-red-700 text-sm rounded-xl px-4 py-3">
-                        <svg
-                          className="w-4 h-4 mt-0.5 flex-shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}>
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                          />
-                        </svg>
-                        <span>{playerErrors[index].name}</span>
-                      </div>
-                    )}
-
-                  {/* مؤشر التحقق من الاسم */}
-                  {checkingNames[index] && (
-                    <div className="mt-2 flex items-center gap-2 text-blue-600 text-sm">
-                      <span
-                        className="inline-block w-4 h-4 border-2 border-blue-400
-                                       border-t-transparent rounded-full animate-spin flex-shrink-0"
-                      />
-                      <span>جارٍ التحقق من الاسم...</span>
-                    </div>
-                  )}
-
                   {/* خطأ تاريخ الميلاد */}
                   {playerErrors[index]?.birthdate && (
                     <div

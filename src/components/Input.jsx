@@ -1,5 +1,4 @@
 import React from "react";
-import { validateQuadName } from "../utils/validatePlayer";
 
 export default function Input({
   label,
@@ -12,9 +11,6 @@ export default function Input({
   pattern,
   maxLength,
 }) {
-  const nameError =
-    name === "name" && value.length > 0 ? validateQuadName(value) : null;
-
   return (
     <div>
       <label className="block mb-2 text-blue-700 font-semibold">{label}</label>
@@ -25,22 +21,10 @@ export default function Input({
         required={required}
         pattern={pattern}
         maxLength={maxLength}
-        className={`w-full border rounded-lg p-2 focus:outline-none focus:ring-2 transition ${
-          nameError ?
-            "border-red-400 focus:ring-red-300"
-          : "border-blue-700 focus:ring-blue-700"
-        }`}
+        className="w-full border border-blue-700 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-700 transition"
         value={value}
         onChange={onChange}
       />
-      {nameError && (
-        <p
-          role="alert"
-          className="mt-1 text-red-600 text-xs flex items-center gap-1">
-          <span>⚠️</span>
-          <span>{nameError}</span>
-        </p>
-      )}
     </div>
   );
 }

@@ -222,43 +222,11 @@ export default function Single({ data, onUpdateSelection }) {
             handleInputChange={handleInputChange}
             handleNationalIdChange={handleNationalIdChange}
             onNationalIdValidation={setNationalIdValid}
+            nameError={nameError}
+            checkingName={checkingName}
           />
 
           {/* ── رسائل الخطأ ── */}
-
-          {/* خطأ تكرار الاسم (يُعرض فقط إذا لم يكن خطأ الصيغة الرباعية) */}
-          {nameError && !validateQuadName(formData.name) && (
-            <div
-              role="alert"
-              className="mt-4 flex items-start gap-2.5 bg-red-50 border border-red-200
-                         text-red-700 text-sm rounded-xl px-4 py-3">
-              <svg
-                className="w-4 h-4 mt-0.5 flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <span>{nameError}</span>
-            </div>
-          )}
-
-          {/* مؤشر التحقق من الاسم */}
-          {checkingName && (
-            <div className="mt-3 flex items-center gap-2 text-blue-600 text-sm">
-              <span
-                className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent
-                               rounded-full animate-spin flex-shrink-0"
-              />
-              <span>جارٍ التحقق من الاسم...</span>
-            </div>
-          )}
-
           {/* خطأ تاريخ الميلاد */}
           {birthdateError && (
             <div
