@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { addPlayer } from "../redux/features/PlayerSlice";
 import toast from "react-hot-toast";
-
-const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../utils/firebase";
 
 export default function usePlayerSave(selectionData, onUpdateSelection) {
   const dispatch = useDispatch();
@@ -31,15 +31,11 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
       phone,
       birthdate,
       form: selectionData?.form?.name || "",
+      createdAt: new Date().toISOString(),
     };
 
     try {
-      const response = await fetch(`${BASE_URL}/players.json`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(player),
-      });
-      if (!response.ok) throw new Error("Failed to save player");
+      await addDoc(collection(db, "players"), player);
       dispatch(addPlayer(player));
       toast.success("تم حفظ اللاعب بنجاح 🎉");
       resetSelection();
@@ -66,14 +62,9 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
           birthdate: p.birthdate,
           form: selectionData?.form?.name || "",
           team: teamName,
+          createdAt: new Date().toISOString(),
         };
-
-        const response = await fetch(`${BASE_URL}/players.json`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(playerData),
-        });
-        if (!response.ok) throw new Error("Failed to save team member");
+        await addDoc(collection(db, "players"), playerData);
         dispatch(addPlayer(playerData));
       }
       toast.success("تم حفظ الفريق بالكامل بنجاح 🎉");

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-
-const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../utils/firebase";
 
 export default function useBracket(bracketKey) {
   const [bracket, setBracket] = useState(null);
@@ -19,7 +19,6 @@ export default function useBracket(bracketKey) {
       return;
     }
 
-    // reset لو اتغير الـ key
     if (prevKeyRef.current !== safeBracketKey) {
       setBracket(null);
       prevKeyRef.current = safeBracketKey;
@@ -28,18 +27,12 @@ export default function useBracket(bracketKey) {
     setLoading(true);
     setError(null);
 
-    fetch(`${BASE_URL}/brackets/${safeBracketKey}.json`)
-      .then((r) => {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      })
-      .then((data) => {
-        // Firebase بيرجع null لو مفيش بيانات
-        setBracket(data || null);
+    getDoc(doc(db, "brackets", safeBracketKey))
+      .then((snap) => {
+        setBracket(snap.exists() ? snap.data() : null);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("useBracket fetch error:", err);
+      .catch(() => {
         setError("فشل تحميل الخريطة");
         setLoading(false);
       });
@@ -47,12 +40,7 @@ export default function useBracket(bracketKey) {
 
   const saveBracket = async (data) => {
     if (!safeBracketKey) return;
-    const res = await fetch(`${BASE_URL}/brackets/${safeBracketKey}.json`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error("Save failed: " + res.status);
+    await setDoc(doc(db, "brackets", safeBracketKey), data);
     setBracket(data);
     return data;
   };

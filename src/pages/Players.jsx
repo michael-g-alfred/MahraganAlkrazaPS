@@ -2,7 +2,7 @@
  * Players.jsx
  * ─────────────────────────────────────────────────────────────────
  * صفحة عرض اللاعبين المسجلين مع إمكانية الفلترة، الحذف، وتصدير Excel.
- * - تستخدم useFetch لجلب البيانات من Firebase Realtime Database.
+ * - تستخدم useFetch لجلب البيانات من Firestore.
  * - تستخدم XLSX من SheetJS لتصدير البيانات.
  * - يحق للمستخدم المُصرَّح له فقط (ALLOWED_ACTION) الحذف والتصدير.
  * ─────────────────────────────────────────────────────────────────
@@ -15,11 +15,11 @@ import useFetch from "../hooks/useFetch";
 import SelectBox from "../components/SelectBox";
 import Pagination from "../components/Pagination";
 import { useAuth } from "../context/AuthContext";
-// SheetJS تُحمَّل من CDN خارجي — لا تحتاج تثبيت npm
+import { doc, deleteDoc, writeBatch, getDocs, collection } from "firebase/firestore";
+import { db } from "../utils/firebase";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 // ─── ثوابت ────────────────────────────────────────────────────────
-const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 /** البريد الإلكتروني الوحيد المسموح له بالحذف والتصدير */
 const ALLOWED_ACTION = "michoolgeorge@gmail.com";
 /** عدد العناصر في كل صفحة */
@@ -27,32 +27,21 @@ const ITEMS_PER_PAGE = 20;
 
 // ─── مساعدات الأفاتار ──────────────────────────────────────────────
 
-/**
- * يستخرج الحرف الأول من الاسم الأول للاعب لعرضه كـ Avatar.
- * @param {string} name - اسم اللاعب الكامل
- * @returns {string} حرف واحد أو "؟" إذا كان الاسم فارغاً
- */
 function getInitials(name = "") {
   const parts = name.trim().split(" ").filter(Boolean);
   if (parts.length === 0) return "؟";
   return parts[0][0];
 }
 
-/** ألوان خلفية ونص للأفاتار — تتناوب بناءً على الاسم */
 const AVATAR_COLORS = [
-  { bg: "#dbeafe", text: "#1e40af" }, // أزرق
-  { bg: "#dcfce7", text: "#166534" }, // أخضر
-  { bg: "#fce7f3", text: "#9d174d" }, // وردي
-  { bg: "#fef9c3", text: "#854d0e" }, // أصفر
-  { bg: "#ede9fe", text: "#5b21b6" }, // بنفسجي
-  { bg: "#ffedd5", text: "#9a3412" }, // برتقالي
+  { bg: "#dbeafe", text: "#1e40af" },
+  { bg: "#dcfce7", text: "#166534" },
+  { bg: "#fce7f3", text: "#9d174d" },
+  { bg: "#fef9c3", text: "#854d0e" },
+  { bg: "#ede9fe", text: "#5b21b6" },
+  { bg: "#ffedd5", text: "#9a3412" },
 ];
 
-/**
- * يختار لون أفاتار محدد بناءً على hash الاسم لضمان ثبات اللون.
- * @param {string} name - اسم اللاعب
- * @returns {{ bg: string, text: string }}
- */
 function avatarColor(name = "") {
   let hash = 0;
   for (let i = 0; i < name.length; i++)
@@ -60,12 +49,8 @@ function avatarColor(name = "") {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-// ─── مكونات الشارات (Badges) ──────────────────────────────────────
+// ─── مكونات الشارات ──────────────────────────────────────────────
 
-/**
- * شارة نوع اللاعب (بنين / بنات).
- * تستخدم ألوانًا مختلفة لكل حالة.
- */
 function GenderBadge({ gender }) {
   if (gender === "بنين")
     return (
@@ -82,10 +67,6 @@ function GenderBadge({ gender }) {
   );
 }
 
-/**
- * شارة نوع الاستمارة (فردي / جماعي).
- * اللون الأخضر للجماعي، الأصفر للفردي.
- */
 function FormBadge({ form }) {
   if (form === "جماعى")
     return (
@@ -102,20 +83,8 @@ function FormBadge({ form }) {
 
 // ─── مكون كارت اللاعب ─────────────────────────────────────────────
 
-/**
- * كارت لاعب واحد قابل للتوسيع (Accordion).
- * - يعرض الاسم والرقم القومي والشارات في الوضع المطوي.
- * - يعرض كل التفاصيل + زر الحذف عند التوسيع.
- *
- * @param {object}   player    - بيانات اللاعب من Firebase
- * @param {number}   index     - رقم اللاعب في القائمة الحالية
- * @param {boolean}  canAction - هل المستخدم مسموح له بالحذف؟
- * @param {Function} onDelete  - دالة الحذف تُستدعى بكائن اللاعب
- */
 function PlayerCard({ player, index, canAction, onDelete }) {
-  // حالة التوسيع / الطي
   const [expanded, setExpanded] = useState(false);
-
   const color = avatarColor(player.name);
   const initials = getInitials(player.name);
 
@@ -124,7 +93,6 @@ function PlayerCard({ player, index, canAction, onDelete }) {
       className={`bg-white border rounded-2xl overflow-hidden transition-all duration-200 ${
         expanded ? "border-blue-300 shadow-sm border-2" : "border-slate-200"
       }`}>
-      {/* ── رأس الكارت القابل للنقر ── */}
       <div
         className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded((v) => !v)}
@@ -133,20 +101,15 @@ function PlayerCard({ player, index, canAction, onDelete }) {
         onKeyDown={(e) => e.key === "Enter" && setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`تفاصيل ${player.name}`}>
-        {/* رقم الترتيب */}
         <span className="text-xs text-slate-400 w-6 text-center flex-shrink-0 font-mono font-bold">
           {index + 1}
         </span>
-
-        {/* أفاتار بالحرف الأول */}
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
           style={{ background: color.bg, color: color.text }}
           aria-hidden="true">
           {initials}
         </div>
-
-        {/* الاسم + الرقم القومي */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-900 truncate leading-tight">
             {player.name}
@@ -157,14 +120,10 @@ function PlayerCard({ player, index, canAction, onDelete }) {
             {player.nationalId || "—"}
           </p>
         </div>
-
-        {/* الشارات (تظهر فقط على الشاشات المتوسطة فما فوق) */}
         <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
           <GenderBadge gender={player.gender} />
           <FormBadge form={player.form} />
         </div>
-
-        {/* أيقونة السهم — تدور عند التوسيع */}
         <svg
           className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           fill="none"
@@ -172,29 +131,19 @@ function PlayerCard({ player, index, canAction, onDelete }) {
           stroke="currentColor"
           strokeWidth={2}
           aria-hidden="true">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </div>
 
-      {/* ── تفاصيل اللاعب (تظهر عند التوسيع) ── */}
       {expanded && (
         <div className="border-t border-slate-100 bg-slate-50/60 px-4 pb-4 pt-3">
-          {/* الشارات على الشاشات الصغيرة */}
           <div className="flex sm:hidden items-center gap-2 mb-3">
             <GenderBadge gender={player.gender} />
             <FormBadge form={player.form} />
           </div>
-
-          {/* شبكة التفاصيل — عمودان */}
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
             <DetailItem label="المرحلة">{player.stage || "—"}</DetailItem>
-            <DetailItem label="تاريخ الميلاد">
-              {player.birthdate || "—"}
-            </DetailItem>
+            <DetailItem label="تاريخ الميلاد">{player.birthdate || "—"}</DetailItem>
             <DetailItem label="اللعبة">{player.game || "—"}</DetailItem>
             <DetailItem label="التليفون">
               <span className="font-mono">{player.phone || "—"}</span>
@@ -202,7 +151,6 @@ function PlayerCard({ player, index, canAction, onDelete }) {
             <DetailItem label="الكنيسة" className="col-span-2">
               {player.church || "—"}
             </DetailItem>
-            {/* اسم الفريق — يظهر فقط إذا كان موجوداً */}
             {player.team && (
               <DetailItem label="الفريق">
                 <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2.5 py-0.5 font-medium">
@@ -212,11 +160,9 @@ function PlayerCard({ player, index, canAction, onDelete }) {
             )}
           </div>
 
-          {/* زر الحذف — يظهر فقط للمستخدم المُصرَّح له */}
           {canAction && (
             <button
               onClick={(e) => {
-                // نمنع الحدث من الوصول للـ div الأب (الذي يطوي الكارت)
                 e.stopPropagation();
                 onDelete(player);
               }}
@@ -224,7 +170,6 @@ function PlayerCard({ player, index, canAction, onDelete }) {
                          text-red-600 bg-red-50 border border-red-200 text-xs font-semibold
                          hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200"
               aria-label={`حذف اللاعب ${player.name}`}>
-              {/* أيقونة سلة المهملات */}
               <svg
                 className="w-4 h-4"
                 fill="none"
@@ -246,11 +191,6 @@ function PlayerCard({ player, index, canAction, onDelete }) {
   );
 }
 
-/**
- * عنصر تفصيلة واحدة داخل الكارت المفتوح.
- * @param {string} label    - التسمية (مثال: "المرحلة")
- * @param {node}   children - القيمة المعروضة
- */
 function DetailItem({ label, children }) {
   return (
     <div>
@@ -263,24 +203,13 @@ function DetailItem({ label, children }) {
 // ─── المكون الرئيسي ────────────────────────────────────────────────
 
 export default function Players() {
-  // جلب بيانات المستخدم المُسجَّل دخوله
   const { user } = useAuth();
-  // هل المستخدم الحالي مسموح له بالحذف والتصدير؟
   const canAction = user?.email?.toLowerCase() === ALLOWED_ACTION;
 
-  // جلب اللاعبين من Firebase
   const [loadingFetch, errorFetch, players] = useFetch();
-
-  // نسخة محلية من اللاعبين تتيح التحديث الفوري بدون إعادة جلب
   const [localPlayers, setLocalPlayers] = useState([]);
-
-  // حالة عملية "حذف الكل" (لمنع النقر المزدوج)
   const [deletingAll, setDeletingAll] = useState(false);
-
-  // الصفحة الحالية في pagination
   const [currentPage, setCurrentPage] = useState(1);
-
-  // حالة الفلاتر — جميعها مبدئيًا فارغة (أي "الكل")
   const [filter, setFilter] = useState({
     gender: "",
     game: "",
@@ -290,42 +219,24 @@ export default function Players() {
     team: "",
   });
 
-  // مزامنة النسخة المحلية مع البيانات المجلوبة
   useEffect(() => {
     setLocalPlayers(players);
   }, [players]);
 
-  /** هل تم تطبيق أي فلتر؟ (لتفعيل زر "مسح الفلاتر") */
   const isFiltered = Object.values(filter).some(Boolean);
 
-  /**
-   * يُحدِّث قيمة فلتر معين ويُعيد الترقيم لأول صفحة.
-   * @param {string} key   - مفتاح الفلتر (مثال: "gender")
-   * @param {string} value - القيمة الجديدة
-   */
   const handleFilterChange = (key, value) => {
     setFilter((prev) => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   };
 
-  /**
-   * يُعيد تعيين جميع الفلاتر للقيم الافتراضية الفارغة.
-   */
   const resetFilters = () => {
-    setFilter({
-      gender: "",
-      game: "",
-      form: "",
-      stage: "",
-      church: "",
-      team: "",
-    });
+    setFilter({ gender: "", game: "", form: "", stage: "", church: "", team: "" });
     setCurrentPage(1);
   };
 
   // ── حساب البيانات المعروضة ────────────────────────────────────
 
-  /** اللاعبون بعد تطبيق جميع الفلاتر المحددة */
   const filteredPlayers = useMemo(
     () =>
       localPlayers.filter((p) => {
@@ -340,43 +251,35 @@ export default function Players() {
     [localPlayers, filter],
   );
 
-  /** إجمالي عدد الصفحات */
   const totalPages = Math.ceil(filteredPlayers.length / ITEMS_PER_PAGE);
 
-  /** اللاعبون في الصفحة الحالية فقط */
   const paginatedPlayers = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredPlayers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredPlayers, currentPage]);
 
-  // ── خيارات الفلاتر (مشتقة من البيانات الفعلية) ────────────────
+  // ── خيارات الفلاتر ────────────────────────────────────────────
 
-  /** قائمة الأنواع المتاحة (بنين / بنات) */
   const genders = useMemo(
     () => [...new Set(localPlayers.map((p) => p.gender).filter(Boolean))],
     [localPlayers],
   );
-  /** قائمة الألعاب المتاحة */
   const games = useMemo(
     () => [...new Set(localPlayers.map((p) => p.game).filter(Boolean))],
     [localPlayers],
   );
-  /** قائمة المراحل المتاحة */
   const stages = useMemo(
     () => [...new Set(localPlayers.map((p) => p.stage).filter(Boolean))],
     [localPlayers],
   );
-  /** قائمة الكنائس المتاحة */
   const churches = useMemo(
     () => [...new Set(localPlayers.map((p) => p.church).filter(Boolean))],
     [localPlayers],
   );
-  /** قائمة نوعي الاستمارة (فردي / جماعي) */
   const forms = useMemo(
     () => [...new Set(localPlayers.map((p) => p.form).filter(Boolean))],
     [localPlayers],
   );
-  /** قائمة أسماء الفرق المتاحة */
   const teams = useMemo(
     () => [...new Set(localPlayers.map((p) => p.team).filter(Boolean))],
     [localPlayers],
@@ -384,45 +287,24 @@ export default function Players() {
 
   // ── دوال الأكشن ───────────────────────────────────────────────
 
-  /**
-   * يحذف لاعبًا واحدًا.
-   * - يُحدِّث الواجهة فورًا (Optimistic UI).
-   * - يرسل طلب DELETE لـ Firebase.
-   * - يُعيد البيانات إذا فشل الطلب.
-   *
-   * @param {object} player - بيانات اللاعب المراد حذفه
-   */
   function handleDeleteItem(player) {
     if (!window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) return;
 
-    // حفظ نسخة احتياطية للرجوع إليها عند الفشل
     const backup = [...localPlayers];
-
-    // حذف فوري من الواجهة
     setLocalPlayers((prev) => prev.filter((x) => x.id !== player.id));
 
-    // إذا أصبحت الصفحة فارغة، انتقل للصفحة السابقة
     if (paginatedPlayers.length === 1 && currentPage > 1) {
       setCurrentPage((prev) => prev - 1);
     }
 
-    // طلب الحذف من Firebase
-    fetch(`${BASE_URL}/players/${player.id}.json`, { method: "DELETE" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Delete failed");
-        toast.success("تم حذف اللاعب ✅");
-      })
+    deleteDoc(doc(db, "players", player.id))
+      .then(() => toast.success("تم حذف اللاعب ✅"))
       .catch(() => {
-        // فشل الحذف — استعادة البيانات
         setLocalPlayers(backup);
         toast.error("فشل الحذف ❌");
       });
   }
 
-  /**
-   * يحذف جميع اللاعبين دفعة واحدة.
-   * يستخدم DELETE على العقدة الجذرية /players.json في Firebase.
-   */
   async function handleDeleteAll() {
     if (
       !window.confirm(
@@ -437,8 +319,10 @@ export default function Players() {
     setCurrentPage(1);
 
     try {
-      const res = await fetch(`${BASE_URL}/players.json`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete all failed");
+      const snapshot = await getDocs(collection(db, "players"));
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
       toast.success("تم حذف جميع اللاعبين 🗑️");
     } catch {
       setLocalPlayers(backup);
@@ -448,12 +332,7 @@ export default function Players() {
     }
   }
 
-  /**
-   * يُصدِّر اللاعبين المعروضين حاليًا (بعد الفلترة) كملف Excel.
-   * يستخدم مكتبة SheetJS لإنشاء الملف وتحميله.
-   */
   function handleExportExcel() {
-    // تحويل بيانات اللاعبين لصفوف Excel بعناوين عربية
     const rows = filteredPlayers.map((p, i) => ({
       "#": i + 1,
       الاسم: p.name,
@@ -468,23 +347,12 @@ export default function Players() {
       "اسم الفريق": p.team || "",
     }));
 
-    // إنشاء ورقة العمل وضبط عروض الأعمدة
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-      { wch: 5 },
-      { wch: 25 },
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 35 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 20 },
+      { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 10 }, { wch: 15 },
+      { wch: 20 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 20 },
     ];
 
-    // إنشاء الملف وتحميله
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "اللاعبين");
     const fileName = `اللاعبين_${new Date().toLocaleDateString("ar-EG").replace(/\//g, "-")}.xlsx`;
@@ -492,7 +360,7 @@ export default function Players() {
     toast.success("تم تحميل Excel ✅");
   }
 
-  // ── حالات التحميل والخطأ والبيانات الفارغة ─────────────────────
+  // ── حالات التحميل والخطأ ─────────────────────────────────────
 
   if (loadingFetch) {
     return (
@@ -504,9 +372,7 @@ export default function Players() {
 
   if (errorFetch) {
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-center gap-3 py-20 text-center">
+      <div role="alert" className="flex flex-col items-center gap-3 py-20 text-center">
         <span className="text-4xl">⚠️</span>
         <p className="text-red-500 font-semibold">{errorFetch}</p>
       </div>
@@ -516,21 +382,11 @@ export default function Players() {
   if (localPlayers.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
-        <svg
-          className="w-16 h-16 text-slate-200"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-          />
+        <svg className="w-16 h-16 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-        <p className="text-lg font-semibold text-slate-500">
-          لا يوجد لاعبين مسجلين بعد
-        </p>
+        <p className="text-lg font-semibold text-slate-500">لا يوجد لاعبين مسجلين بعد</p>
         <p className="text-sm">ابدأ بتسجيل اللاعبين من الصفحة الرئيسية</p>
       </div>
     );
@@ -582,28 +438,17 @@ export default function Players() {
             onChange={(e) => handleFilterChange("team", e.target.value)}
             options={teams}
           />
-
-          {/* زر مسح الفلاتر — يُفعَّل فقط عند وجود فلتر مُطبَّق */}
           <button
             onClick={resetFilters}
             disabled={!isFiltered}
             title="مسح جميع الفلاتر"
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-              isFiltered ?
-                "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
-              : "bg-slate-100 text-slate-300 cursor-not-allowed"
+              isFiltered
+                ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+                : "bg-slate-100 text-slate-300 cursor-not-allowed"
             }`}>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
             مسح
           </button>
@@ -612,69 +457,44 @@ export default function Players() {
 
       {/* ═══ شريط الإحصاء والأزرار ══════════════════════════════ */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4 px-1">
-        {/* عداد النتائج */}
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-blue-700 inline-block"></span>
-          <p
-            className="text-sm font-semibold text-slate-700"
-            aria-live="polite">
+          <p className="text-sm font-semibold text-slate-700" aria-live="polite">
             {filteredPlayers.length} لاعب
             {isFiltered && (
-              <span className="text-slate-400 font-normal">
-                {" "}
-                من {localPlayers.length}
-              </span>
+              <span className="text-slate-400 font-normal"> من {localPlayers.length}</span>
             )}
           </p>
         </div>
 
-        {/* أزرار الأكشن (مرئية للمسؤول فقط) */}
         {canAction && (
           <div className="flex items-center gap-2">
-            {/* تصدير Excel */}
             <button
               onClick={handleExportExcel}
               disabled={filteredPlayers.length === 0}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                filteredPlayers.length === 0 ?
-                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
+                filteredPlayers.length === 0
+                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
               }`}>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               Excel
             </button>
 
-            {/* حذف الكل */}
             <button
               onClick={handleDeleteAll}
               disabled={deletingAll || localPlayers.length === 0}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                deletingAll || localPlayers.length === 0 ?
-                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+                deletingAll || localPlayers.length === 0
+                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                  : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
               }`}>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               {deletingAll ? "جاري الحذف..." : "مسح الكل"}
             </button>
@@ -683,26 +503,16 @@ export default function Players() {
       </div>
 
       {/* ═══ قائمة اللاعبين ══════════════════════════════════════ */}
-      {filteredPlayers.length === 0 ?
-        // حالة عدم وجود نتائج للفلتر المطبَّق
+      {filteredPlayers.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
-          <svg
-            className="w-10 h-10 text-slate-200"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
+          <svg className="w-10 h-10 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <p className="font-semibold text-slate-500">لا توجد نتائج</p>
           <p className="text-sm">حاول تغيير الفلتر أو مسحه</p>
         </div>
-      : <>
-          {/* كروت اللاعبين — كل كارت قابل للتوسيع */}
+      ) : (
+        <>
           <div className="flex flex-col gap-2 pb-4">
             {paginatedPlayers.map((player, index) => (
               <PlayerCard
@@ -714,15 +524,13 @@ export default function Players() {
               />
             ))}
           </div>
-
-          {/* شريط التنقل بين الصفحات */}
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
           />
         </>
-      }
+      )}
     </div>
   );
 }

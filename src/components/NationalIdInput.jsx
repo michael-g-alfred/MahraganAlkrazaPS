@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../utils/firebase";
 
 const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 const ID_LENGTH = 14;
@@ -6,11 +8,10 @@ const ID_LENGTH = 14;
 async function checkNationalIdUnique(nationalId) {
   if (nationalId.length !== ID_LENGTH) return null;
   try {
-    const res = await fetch(`${BASE_URL}/players.json`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data) return null;
-    const exists = Object.values(data).some((p) => p.nationalId === nationalId);
+    const snapshot = await getDocs(collection(db, "players"));
+    const exists = snapshot.docs.some(
+      (doc) => doc.data().nationalId === nationalId,
+    );
     return exists ? "هذا الرقم القومى مسجل من قبل" : null;
   } catch {
     return null;
