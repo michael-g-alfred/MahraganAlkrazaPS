@@ -5,6 +5,26 @@ import toast from "react-hot-toast";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
+// ترجمة أكواد خطأ Firebase لرسائل عربية مفهومة
+function getFirebaseErrorMessage(err) {
+  const code = err?.code || "";
+  const message = err?.message || "";
+
+  if (code === "permission-denied" || message.includes("permission-denied"))
+    return "❌ ليس لديك صلاحية — تحقق من قواعد Firestore";
+  if (code === "unavailable" || message.includes("unavailable"))
+    return "❌ الخادم غير متاح حالياً — تحقق من الإنترنت وحاول مرة أخرى";
+  if (code === "quota-exceeded" || message.includes("quota"))
+    return "❌ تم تجاوز حصة الاستخدام — تواصل مع المسؤول";
+  if (code === "unauthenticated" || message.includes("unauthenticated"))
+    return "❌ يجب تسجيل الدخول أولاً";
+  if (message.includes("offline") || message.includes("network"))
+    return "❌ لا يوجد اتصال بالإنترنت";
+
+  // إظهار الخطأ الحرفي إن لم يُعرَّف
+  return `❌ خطأ: ${message || code || "غير معروف"}`;
+}
+
 export default function usePlayerSave(selectionData, onUpdateSelection) {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
@@ -41,7 +61,12 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
       resetSelection();
     } catch (err) {
       console.error("❌ savePlayer error:", err);
-      toast.error("حدث خطأ أثناء الحفظ ❌");
+      const errorMsg = getFirebaseErrorMessage(err);
+      // إظهار رسالة الخطأ الحقيقية للمستخدم
+      toast.error(errorMsg, {
+        duration: 6000,
+        style: { maxWidth: "400px", textAlign: "right", direction: "rtl" },
+      });
     } finally {
       setLoading(false);
     }
@@ -71,7 +96,11 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
       resetSelection();
     } catch (err) {
       console.error("❌ saveTeam error:", err);
-      toast.error("حدث خطأ أثناء حفظ الفريق ❌");
+      const errorMsg = getFirebaseErrorMessage(err);
+      toast.error(errorMsg, {
+        duration: 6000,
+        style: { maxWidth: "400px", textAlign: "right", direction: "rtl" },
+      });
     } finally {
       setLoading(false);
     }

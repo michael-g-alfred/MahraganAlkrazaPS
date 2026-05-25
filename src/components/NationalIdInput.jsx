@@ -2,15 +2,21 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
-const BASE_URL = import.meta.env.VITE_FIREBASE_URL;
 const ID_LENGTH = 14;
+
+// تحويل الأرقام العربية والفارسية إلى إنجليزية
+function toEnglishDigits(str) {
+  return str
+    .replace(/[\u0660-\u0669]/g, (c) => c.charCodeAt(0) - 0x0660) // عربية
+    .replace(/[\u06F0-\u06F9]/g, (c) => c.charCodeAt(0) - 0x06F0); // فارسية
+}
 
 async function checkNationalIdUnique(nationalId) {
   if (nationalId.length !== ID_LENGTH) return null;
   try {
     const snapshot = await getDocs(collection(db, "players"));
     const exists = snapshot.docs.some(
-      (doc) => doc.data().nationalId === nationalId,
+      (doc) => doc.data().nationalId === nationalId
     );
     return exists ? "هذا الرقم القومى مسجل من قبل" : null;
   } catch {
@@ -37,30 +43,17 @@ export default function NationalIdInput({
   const fullId = digits.join("");
   const isComplete = fullId.length === ID_LENGTH && !digits.includes("");
 
-  // ── إبلاغ الـ parent بحالة الـ checking ──
-  useEffect(() => {
-    onChecking?.(checking);
-  }, [checking, onChecking]);
+  useEffect(() => { onChecking?.(checking); }, [checking, onChecking]);
+  useEffect(() => { onError?.(error); }, [error, onError]);
 
-  // ── إبلاغ الـ parent بحالة الـ error ──
-  useEffect(() => {
-    onError?.(error);
-  }, [error, onError]);
-
-  // ── كل ما تتغير الحالة → نبلغ الـ parent ──
   useEffect(() => {
     const isValid = isComplete && !checking && !error;
     onValidationChange?.(isValid);
     onSuccess?.(isValid);
   }, [isComplete, checking, error, onValidationChange, onSuccess]);
 
-  // ── كل ما يكتمل الرقم → نعمل check ──
   useEffect(() => {
-    if (!isComplete) {
-      setError(null);
-      return;
-    }
-
+    if (!isComplete) { setError(null); return; }
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setChecking(true);
@@ -69,7 +62,6 @@ export default function NationalIdInput({
       setError(err);
       setChecking(false);
     }, 500);
-
     return () => clearTimeout(debounceRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
@@ -80,7 +72,7 @@ export default function NationalIdInput({
       arr[index] = char;
       onChange(arr.join(""));
     },
-    [value, onChange],
+    [value, onChange]
   );
 
   const handleKeyDown = (e, index) => {
@@ -102,7 +94,9 @@ export default function NationalIdInput({
   };
 
   const handleInput = (e, index) => {
-    const val = e.target.value.replace(/\D/g, "");
+    // تحويل الأرقام العربية/الفارسية لإنجليزية أولاً
+    const converted = toEnglishDigits(e.target.value);
+    const val = converted.replace(/\D/g, "");
     if (!val) return;
     const char = val[val.length - 1];
     updateDigit(index, char);
@@ -113,18 +107,18 @@ export default function NationalIdInput({
 
   const handlePaste = (e, startIndex) => {
     e.preventDefault();
-    const pasted = e.clipboardData
-      .getData("text")
+    // تحويل الأرقام العربية/الفارسية في النص الملصق
+    const raw = toEnglishDigits(e.clipboardData.getData("text"))
       .replace(/\D/g, "")
       .slice(0, ID_LENGTH - startIndex);
-    if (!pasted) return;
+    if (!raw) return;
 
     const arr = Array.from({ length: ID_LENGTH }, (_, i) => value?.[i] || "");
-    pasted.split("").forEach((ch, i) => {
+    raw.split("").forEach((ch, i) => {
       if (startIndex + i < ID_LENGTH) arr[startIndex + i] = ch;
     });
     onChange(arr.join(""));
-    const nextFocus = Math.min(startIndex + pasted.length, ID_LENGTH - 1);
+    const nextFocus = Math.min(startIndex + raw.length, ID_LENGTH - 1);
     setTimeout(() => inputRefs.current[nextFocus]?.focus(), 0);
   };
 
@@ -135,24 +129,20 @@ export default function NationalIdInput({
         <span className="text-gray-400 text-xs font-normal me-2">(١٤ رقم)</span>
       </label>
 
-      <div
-        className="flex flex-wrap gap-1.5 justify-start items-center"
-        dir="ltr">
+      <div className="flex flex-wrap gap-1.5 justify-start items-center" dir="ltr">
         {Array.from({ length: ID_LENGTH }, (_, i) => {
           const isGroupStart = i === 1 || i === 7 || i === 10;
           return (
             <React.Fragment key={i}>
               {isGroupStart && (
-                <span className="text-blue-300 font-bold text-lg select-none">
-                  -
-                </span>
+                <span className="text-blue-300 font-bold text-lg select-none">-</span>
               )}
               <input
                 ref={(el) => (inputRefs.current[i] = el)}
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]"
-                maxLength={1}
+                maxLength={2}
                 value={digits[i]}
                 onChange={(e) => handleInput(e, i)}
                 onKeyDown={(e) => handleKeyDown(e, i)}
@@ -164,13 +154,13 @@ export default function NationalIdInput({
                   w-9 h-11 text-center text-lg font-bold rounded-lg border-2 outline-none
                   transition-all duration-150 select-none
                   ${
-                    digits[i] ?
-                      error && isComplete ?
-                        "border-red-400 bg-red-50 text-red-700"
-                      : isComplete && !checking && !error ?
-                        "border-green-500 bg-green-50 text-green-700"
-                      : "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-300 bg-white text-gray-800 hover:border-blue-400"
+                    digits[i]
+                      ? error && isComplete
+                        ? "border-red-400 bg-red-50 text-red-700"
+                        : isComplete && !checking && !error
+                        ? "border-green-500 bg-green-50 text-green-700"
+                        : "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-300 bg-white text-gray-800 hover:border-blue-400"
                   }
                   focus:border-blue-700 focus:bg-blue-50 focus:shadow-[0_0_0_3px_rgba(29,78,216,0.15)]
                   caret-transparent
@@ -181,7 +171,6 @@ export default function NationalIdInput({
         })}
       </div>
 
-      {/* الخانات المتبقية فقط — باقي الرسائل في Card */}
       <div className="mt-2 min-h-[1rem]">
         {!isComplete && fullId.length > 0 && (
           <p className="text-gray-400 text-xs">
