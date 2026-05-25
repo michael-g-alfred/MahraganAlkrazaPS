@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useDispatch } from "react-redux";
-import { addPlayer } from "../redux/features/PlayerSlice";
 import toast from "react-hot-toast";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../utils/firebase";
@@ -26,7 +24,6 @@ function getFirebaseErrorMessage(err) {
 }
 
 export default function usePlayerSave(selectionData, onUpdateSelection) {
-  const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
 
   const resetSelection = () => {
@@ -56,7 +53,6 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
 
     try {
       await addDoc(collection(db, "players"), player);
-      dispatch(addPlayer(player));
       toast.success("تم حفظ اللاعب بنجاح 🎉");
       resetSelection();
     } catch (err) {
@@ -90,7 +86,6 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
           createdAt: new Date().toISOString(),
         };
         await addDoc(collection(db, "players"), playerData);
-        dispatch(addPlayer(playerData));
       }
       toast.success("تم حفظ الفريق بالكامل بنجاح 🎉");
       resetSelection();

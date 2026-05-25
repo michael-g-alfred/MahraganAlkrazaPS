@@ -9,8 +9,6 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Error from "../pages/Error";
 import Home from "../pages/Home";
-import { Provider } from "react-redux";
-import { store } from "../redux/app/store";
 import Players from "../pages/Players";
 import { Toaster } from "react-hot-toast";
 import Login from "../pages/Login";
@@ -73,9 +71,5 @@ const router = createBrowserRouter([
 ]);
 
 export default function AppRouter() {
-  return (
-    <Provider store={store}>
-      <RouterProvider router={router} />
-    </Provider>
-  );
+  return <RouterProvider router={router} />;
 }
