@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
 export default function useBracket(bracketKey) {
@@ -27,21 +27,24 @@ export default function useBracket(bracketKey) {
     setLoading(true);
     setError(null);
 
-    getDoc(doc(db, "brackets", safeBracketKey))
-      .then((snap) => {
+    const unsubscribe = onSnapshot(
+      doc(db, "brackets", safeBracketKey),
+      (snap) => {
         setBracket(snap.exists() ? snap.data() : null);
         setLoading(false);
-      })
-      .catch(() => {
+      },
+      () => {
         setError("فشل تحميل الخريطة");
         setLoading(false);
-      });
+      },
+    );
+
+    return () => unsubscribe();
   }, [safeBracketKey]);
 
   const saveBracket = async (data) => {
     if (!safeBracketKey) return;
     await setDoc(doc(db, "brackets", safeBracketKey), data);
-    setBracket(data);
     return data;
   };
 

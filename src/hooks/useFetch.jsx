@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
 export function normalizeField(field) {
@@ -17,8 +17,9 @@ export default function useFetch() {
     setLoadingFetch(true);
     setErrorFetch(null);
 
-    getDocs(collection(db, "players"))
-      .then((snapshot) => {
+    const unsubscribe = onSnapshot(
+      collection(db, "players"),
+      (snapshot) => {
         const arr = snapshot.docs.map((doc) => {
           const raw = doc.data();
           return {
@@ -35,11 +36,16 @@ export default function useFetch() {
         });
         setPlayers(arr);
         setLoadingFetch(false);
-      })
-      .catch(() => {
+      },
+      (error) => {
+        console.error(error);
         setErrorFetch("فشل جلب البيانات من السيرفر");
         setLoadingFetch(false);
-      });
+      },
+    );
+
+    // إلغاء الـ listener لما المكون يتشال من الشاشة
+    return () => unsubscribe();
   }, []);
 
   return [loadingFetch, errorFetch, players];

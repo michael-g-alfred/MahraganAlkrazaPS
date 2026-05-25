@@ -1,5 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  getCountFromServer,
+} from "firebase/firestore";
 import { db } from "../utils/firebase";
 
 const ID_LENGTH = 14;
@@ -8,17 +14,18 @@ const ID_LENGTH = 14;
 function toEnglishDigits(str) {
   return str
     .replace(/[\u0660-\u0669]/g, (c) => c.charCodeAt(0) - 0x0660) // عربية
-    .replace(/[\u06F0-\u06F9]/g, (c) => c.charCodeAt(0) - 0x06F0); // فارسية
+    .replace(/[\u06F0-\u06F9]/g, (c) => c.charCodeAt(0) - 0x06f0); // فارسية
 }
 
 async function checkNationalIdUnique(nationalId) {
   if (nationalId.length !== ID_LENGTH) return null;
   try {
-    const snapshot = await getDocs(collection(db, "players"));
-    const exists = snapshot.docs.some(
-      (doc) => doc.data().nationalId === nationalId
+    const q = query(
+      collection(db, "players"),
+      where("nationalId", "==", nationalId),
     );
-    return exists ? "هذا الرقم القومى مسجل من قبل" : null;
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count > 0 ? "هذا الرقم القومى مسجل من قبل" : null;
   } catch {
     return null;
   }
@@ -43,8 +50,12 @@ export default function NationalIdInput({
   const fullId = digits.join("");
   const isComplete = fullId.length === ID_LENGTH && !digits.includes("");
 
-  useEffect(() => { onChecking?.(checking); }, [checking, onChecking]);
-  useEffect(() => { onError?.(error); }, [error, onError]);
+  useEffect(() => {
+    onChecking?.(checking);
+  }, [checking, onChecking]);
+  useEffect(() => {
+    onError?.(error);
+  }, [error, onError]);
 
   useEffect(() => {
     const isValid = isComplete && !checking && !error;
@@ -53,7 +64,10 @@ export default function NationalIdInput({
   }, [isComplete, checking, error, onValidationChange, onSuccess]);
 
   useEffect(() => {
-    if (!isComplete) { setError(null); return; }
+    if (!isComplete) {
+      setError(null);
+      return;
+    }
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setChecking(true);
@@ -72,7 +86,7 @@ export default function NationalIdInput({
       arr[index] = char;
       onChange(arr.join(""));
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   const handleKeyDown = (e, index) => {
@@ -129,13 +143,17 @@ export default function NationalIdInput({
         <span className="text-gray-400 text-xs font-normal me-2">(١٤ رقم)</span>
       </label>
 
-      <div className="flex flex-wrap gap-1.5 justify-start items-center" dir="ltr">
+      <div
+        className="flex flex-wrap gap-1.5 justify-start items-center"
+        dir="ltr">
         {Array.from({ length: ID_LENGTH }, (_, i) => {
           const isGroupStart = i === 1 || i === 7 || i === 10;
           return (
             <React.Fragment key={i}>
               {isGroupStart && (
-                <span className="text-blue-300 font-bold text-lg select-none">-</span>
+                <span className="text-blue-300 font-bold text-lg select-none">
+                  -
+                </span>
               )}
               <input
                 ref={(el) => (inputRefs.current[i] = el)}
@@ -154,13 +172,13 @@ export default function NationalIdInput({
                   w-9 h-11 text-center text-lg font-bold rounded-lg border-2 outline-none
                   transition-all duration-150 select-none
                   ${
-                    digits[i]
-                      ? error && isComplete
-                        ? "border-red-400 bg-red-50 text-red-700"
-                        : isComplete && !checking && !error
-                        ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-300 bg-white text-gray-800 hover:border-blue-400"
+                    digits[i] ?
+                      error && isComplete ?
+                        "border-red-400 bg-red-50 text-red-700"
+                      : isComplete && !checking && !error ?
+                        "border-green-500 bg-green-50 text-green-700"
+                      : "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-300 bg-white text-gray-800 hover:border-blue-400"
                   }
                   focus:border-blue-700 focus:bg-blue-50 focus:shadow-[0_0_0_3px_rgba(29,78,216,0.15)]
                   caret-transparent
