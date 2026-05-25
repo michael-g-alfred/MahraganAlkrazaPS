@@ -44,20 +44,29 @@ function normalizeName(str) {
 
 export async function validateNameUnique(name, selectionData) {
   if (!name?.trim() || !selectionData?.stage?.name) return null;
+
   try {
-    const snapshot = await getDocs(collection(db, "players"));
     const stageName = selectionData.stage?.name || "";
     const genderName = selectionData.gender?.name || "";
+
+    const q = query(
+      collection(db, "players"),
+      where("stage", "==", stageName),
+      where("gender", "==", genderName),
+    );
+
+    const snapshot = await getDocs(q);
+
     const duplicate = snapshot.docs.find((doc) => {
       const p = doc.data();
-      return (
-        normalizeName(p.name) === normalizeName(name) &&
-        p.stage === stageName &&
-        p.gender === genderName
-      );
+
+      return normalizeName(p.name) === normalizeName(name);
     });
-    if (duplicate)
+
+    if (duplicate) {
       return `الاسم "${name}" مسجل بالفعل في ${stageName} - ${genderName}`;
+    }
+
     return null;
   } catch {
     return null;
