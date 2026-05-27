@@ -5,6 +5,7 @@
  * - تستخدم useFetch لجلب البيانات من Firestore.
  * - تستخدم XLSX من SheetJS لتصدير البيانات.
  * - يحق للمستخدم المُصرَّح له فقط (ALLOWED_ACTION) الحذف والتصدير.
+ * - checkbox لتحديد دفع اشتراك اللاعب (paid) مع تحديث Firestore فوري.
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -15,14 +16,19 @@ import useFetch from "../hooks/useFetch";
 import SelectBox from "../components/SelectBox";
 import Pagination from "../components/Pagination";
 import { useAuth } from "../context/AuthContext";
-import { doc, deleteDoc, writeBatch, getDocs, collection } from "firebase/firestore";
+import {
+  doc,
+  deleteDoc,
+  writeBatch,
+  getDocs,
+  collection,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../utils/firebase";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 // ─── ثوابت ────────────────────────────────────────────────────────
-/** البريد الإلكتروني الوحيد المسموح له بالحذف والتصدير */
 const ALLOWED_ACTION = "michoolgeorge@gmail.com";
-/** عدد العناصر في كل صفحة */
 const ITEMS_PER_PAGE = 20;
 
 // ─── مساعدات الأفاتار ──────────────────────────────────────────────
@@ -81,9 +87,63 @@ function FormBadge({ form }) {
   );
 }
 
+// ─── Paid Checkbox ────────────────────────────────────────────────
+
+function PaidCheckbox({ playerId, paid, onToggle }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = async (e) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "players", playerId), { paid: !paid });
+      onToggle(playerId, !paid);
+      toast.success(!paid ? "✅ تم تسجيل الدفع" : "↩️ تم إلغاء الدفع", {
+        duration: 2000,
+      });
+    } catch {
+      toast.error("فشل تحديث حالة الدفع");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleChange}
+      disabled={loading}
+      aria-label={paid ? "إلغاء الدفع" : "تسجيل الدفع"}
+      className={`
+        flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
+        border transition-all duration-200 flex-shrink-0
+        ${
+          loading
+            ? "opacity-50 cursor-wait border-slate-200 bg-slate-50 text-slate-400"
+            : paid
+            ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
+            : "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
+        }
+      `}>
+      {loading ? (
+        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+      ) : paid ? (
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      )}
+      {paid ? "دفع" : "لم يدفع"}
+    </button>
+  );
+}
+
 // ─── مكون كارت اللاعب ─────────────────────────────────────────────
 
-function PlayerCard({ player, index, canAction, onDelete }) {
+function PlayerCard({ player, index, canAction, onDelete, onPaidToggle }) {
   const [expanded, setExpanded] = useState(false);
   const color = avatarColor(player.name);
   const initials = getInitials(player.name);
@@ -120,10 +180,21 @@ function PlayerCard({ player, index, canAction, onDelete }) {
             {player.nationalId || "—"}
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-          <GenderBadge gender={player.gender} />
-          <FormBadge form={player.form} />
+
+        {/* ── Paid badge + gender/form ── */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Paid toggle — يوقف نشر حدث الضغط لمنع expand/collapse */}
+          <PaidCheckbox
+            playerId={player.id}
+            paid={!!player.paid}
+            onToggle={onPaidToggle}
+          />
+          <div className="hidden sm:flex items-center gap-1.5">
+            <GenderBadge gender={player.gender} />
+            <FormBadge form={player.form} />
+          </div>
         </div>
+
         <svg
           className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           fill="none"
@@ -158,6 +229,16 @@ function PlayerCard({ player, index, canAction, onDelete }) {
                 </span>
               </DetailItem>
             )}
+            <DetailItem label="حالة الاشتراك">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium ${
+                  player.paid
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-red-50 text-red-600"
+                }`}>
+                {player.paid ? "✓ دفع الاشتراك" : "✗ لم يدفع بعد"}
+              </span>
+            </DetailItem>
           </div>
 
           {canAction && (
@@ -217,6 +298,7 @@ export default function Players() {
     stage: "",
     church: "",
     team: "",
+    paid: "",   // "" | "paid" | "unpaid"
   });
 
   useEffect(() => {
@@ -231,8 +313,16 @@ export default function Players() {
   };
 
   const resetFilters = () => {
-    setFilter({ gender: "", game: "", form: "", stage: "", church: "", team: "" });
+    setFilter({ gender: "", game: "", form: "", stage: "", church: "", team: "", paid: "" });
     setCurrentPage(1);
+  };
+
+  // ── تحديث paid محلياً بعد نجاح Firestore ─────────────────────
+
+  const handlePaidToggle = (playerId, newPaid) => {
+    setLocalPlayers((prev) =>
+      prev.map((p) => (p.id === playerId ? { ...p, paid: newPaid } : p))
+    );
   };
 
   // ── حساب البيانات المعروضة ────────────────────────────────────
@@ -246,6 +336,8 @@ export default function Players() {
         if (filter.church && p.church !== filter.church) return false;
         if (filter.form && p.form !== filter.form) return false;
         if (filter.team && p.team !== filter.team) return false;
+        if (filter.paid === "دفعوا فقط" && !p.paid) return false;
+        if (filter.paid === "لم يدفعوا فقط" && p.paid) return false;
         return true;
       }),
     [localPlayers, filter],
@@ -345,13 +437,29 @@ export default function Players() {
       "رقم التليفون": p.phone,
       الإستمارة: p.form,
       "اسم الفريق": p.team || "",
+      "دفع الاشتراك": p.paid ? "دفع ✓" : "لم يدفع ✗",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
       { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 10 }, { wch: 15 },
-      { wch: 20 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 20 },
+      { wch: 20 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+      { wch: 20 }, { wch: 15 },
     ];
+
+    // تلوين خلايا "دفع الاشتراك" — أخضر للدافع، أحمر للمتأخر
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    const paidColIdx = 11; // عمود "دفع الاشتراك" (0-indexed)
+    for (let R = range.s.r + 1; R <= range.e.r; R++) {
+      const cellAddr = XLSX.utils.encode_cell({ r: R, c: paidColIdx });
+      if (!ws[cellAddr]) continue;
+      const isPaid = filteredPlayers[R - 1]?.paid;
+      ws[cellAddr].s = {
+        fill: { fgColor: { rgb: isPaid ? "C6EFCE" : "FFC7CE" } },
+        font: { color: { rgb: isPaid ? "276221" : "9C0006" }, bold: true },
+        alignment: { horizontal: "center" },
+      };
+    }
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "اللاعبين");
@@ -396,6 +504,7 @@ export default function Players() {
 
   return (
     <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
+
       {/* ═══ شريط الفلاتر ═══════════════════════════════════════ */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
         <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">
@@ -438,6 +547,13 @@ export default function Players() {
             onChange={(e) => handleFilterChange("team", e.target.value)}
             options={teams}
           />
+          <SelectBox
+            label="الاشتراك"
+            value={filter.paid}
+            onChange={(e) => handleFilterChange("paid", e.target.value)}
+            options={["دفعوا فقط", "لم يدفعوا فقط"]}
+          />
+
           <button
             onClick={resetFilters}
             disabled={!isFiltered}
@@ -521,6 +637,7 @@ export default function Players() {
                 index={(currentPage - 1) * ITEMS_PER_PAGE + index}
                 canAction={canAction}
                 onDelete={handleDeleteItem}
+                onPaidToggle={handlePaidToggle}
               />
             ))}
           </div>
