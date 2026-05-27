@@ -3,7 +3,6 @@ import toast from "react-hot-toast";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
-// ترجمة أكواد خطأ Firebase لرسائل عربية مفهومة
 function getFirebaseErrorMessage(err) {
   const code = err?.code || "";
   const message = err?.message || "";
@@ -19,7 +18,6 @@ function getFirebaseErrorMessage(err) {
   if (message.includes("offline") || message.includes("network"))
     return "❌ لا يوجد اتصال بالإنترنت";
 
-  // إظهار الخطأ الحرفي إن لم يُعرَّف
   return `❌ خطأ: ${message || code || "غير معروف"}`;
 }
 
@@ -48,6 +46,7 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
       phone,
       birthdate,
       form: selectionData?.form?.name || "",
+      paid: false,
       createdAt: new Date().toISOString(),
     };
 
@@ -58,7 +57,6 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
     } catch (err) {
       console.error("❌ savePlayer error:", err);
       const errorMsg = getFirebaseErrorMessage(err);
-      // إظهار رسالة الخطأ الحقيقية للمستخدم
       toast.error(errorMsg, {
         duration: 6000,
         style: { maxWidth: "400px", textAlign: "right", direction: "rtl" },
@@ -83,6 +81,7 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
           birthdate: p.birthdate,
           form: selectionData?.form?.name || "",
           team: teamName,
+          paid: false,
           createdAt: new Date().toISOString(),
         };
         await addDoc(collection(db, "players"), playerData);
