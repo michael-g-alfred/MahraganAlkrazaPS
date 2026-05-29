@@ -4,7 +4,7 @@
  * صفحة عرض اللاعبين المسجلين مع إمكانية الفلترة، الحذف، وتصدير Excel.
  * - تستخدم useFetch لجلب البيانات من Firestore.
  * - تستخدم XLSX من SheetJS لتصدير البيانات.
- * - يحق للمستخدم المُصرَّح له فقط (ALLOWED_ACTION) الحذف والتصدير.
+ * - يحق للمستخدم المُصرَّح له فقط الحذف والتصدير أو تحديث الدفع بناءً على الصلاحيات.
  * - checkbox لتحديد دفع اشتراك اللاعب (paid) مع تحديث Firestore فوري.
  * ─────────────────────────────────────────────────────────────────
  */
@@ -27,8 +27,10 @@ import {
 import { db } from "../utils/firebase";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
-// ─── ثوابت ────────────────────────────────────────────────────────
-const ALLOWED_ACTION = "michoolgeorge@gmail.com";
+// ─── جلب الثوابت من ملف الـ .env ──────────────────────────────────
+// ملاحظة: لو شغال Create React App استبدل import.meta.env بـ process.env.REACT_APP_
+const ALLOWED_ACTION_EMAIL = import.meta.env.VITE_ALLOWED_ACTION?.toLowerCase();
+const ALLOWED_PAID_EMAIL = import.meta.env.VITE_ALLOWED_PAID?.toLowerCase();
 const ITEMS_PER_PAGE = 20;
 
 // ─── مساعدات الأفاتار ──────────────────────────────────────────────
@@ -87,13 +89,14 @@ function FormBadge({ form }) {
   );
 }
 
-// ─── Paid Checkbox ────────────────────────────────────────────────
+// ─── Paid Checkbox / Badge ────────────────────────────────────────
 
-function PaidCheckbox({ playerId, paid, onToggle }) {
+function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
   const [loading, setLoading] = useState(false);
 
   const handleChange = async (e) => {
     e.stopPropagation();
+    if (!canPaidAction) return; // حماية إضافية
     setLoading(true);
     try {
       await updateDoc(doc(db, "players", playerId), { paid: !paid });
@@ -108,6 +111,19 @@ function PaidCheckbox({ playerId, paid, onToggle }) {
     }
   };
 
+  // إذا لم يكن له صلاحية التعديل، يظهر كـ شارة (Badge) عادية فقط بدون إمكانية الضغط
+  if (!canPaidAction) {
+    return (
+      <span
+        className={`
+        flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border flex-shrink-0
+        ${paid ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-500"}
+      `}>
+        {paid ? "دفع" : "لم يدفع"}
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -118,24 +134,41 @@ function PaidCheckbox({ playerId, paid, onToggle }) {
         flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
         border transition-all duration-200 flex-shrink-0
         ${
-          loading
-            ? "opacity-50 cursor-wait border-slate-200 bg-slate-50 text-slate-400"
-            : paid
-            ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
-            : "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
+          loading ?
+            "opacity-50 cursor-wait border-slate-200 bg-slate-50 text-slate-400"
+          : paid ?
+            "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
+          : "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
         }
       `}>
-      {loading ? (
+      {loading ?
         <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-      ) : paid ? (
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      : paid ?
+        <svg
+          className="w-3 h-3"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
         </svg>
-      ) : (
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      : <svg
+          className="w-3 h-3"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
-      )}
+      }
       {paid ? "دفع" : "لم يدفع"}
     </button>
   );
@@ -143,7 +176,14 @@ function PaidCheckbox({ playerId, paid, onToggle }) {
 
 // ─── مكون كارت اللاعب ─────────────────────────────────────────────
 
-function PlayerCard({ player, index, canAction, onDelete, onPaidToggle }) {
+function PlayerCard({
+  player,
+  index,
+  canAction,
+  canPaidAction,
+  onDelete,
+  onPaidToggle,
+}) {
   const [expanded, setExpanded] = useState(false);
   const color = avatarColor(player.name);
   const initials = getInitials(player.name);
@@ -183,11 +223,11 @@ function PlayerCard({ player, index, canAction, onDelete, onPaidToggle }) {
 
         {/* ── Paid badge + gender/form ── */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Paid toggle — يوقف نشر حدث الضغط لمنع expand/collapse */}
           <PaidCheckbox
             playerId={player.id}
             paid={!!player.paid}
             onToggle={onPaidToggle}
+            canPaidAction={canPaidAction}
           />
           <div className="hidden sm:flex items-center gap-1.5">
             <GenderBadge gender={player.gender} />
@@ -202,7 +242,11 @@ function PlayerCard({ player, index, canAction, onDelete, onPaidToggle }) {
           stroke="currentColor"
           strokeWidth={2}
           aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </div>
 
@@ -214,7 +258,9 @@ function PlayerCard({ player, index, canAction, onDelete, onPaidToggle }) {
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
             <DetailItem label="المرحلة">{player.stage || "—"}</DetailItem>
-            <DetailItem label="تاريخ الميلاد">{player.birthdate || "—"}</DetailItem>
+            <DetailItem label="تاريخ الميلاد">
+              {player.birthdate || "—"}
+            </DetailItem>
             <DetailItem label="اللعبة">{player.game || "—"}</DetailItem>
             <DetailItem label="التليفون">
               <span className="font-mono">{player.phone || "—"}</span>
@@ -232,9 +278,9 @@ function PlayerCard({ player, index, canAction, onDelete, onPaidToggle }) {
             <DetailItem label="حالة الاشتراك">
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium ${
-                  player.paid
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-red-50 text-red-600"
+                  player.paid ?
+                    "bg-emerald-100 text-emerald-800"
+                  : "bg-red-50 text-red-600"
                 }`}>
                 {player.paid ? "✓ دفع الاشتراك" : "✗ لم يدفع بعد"}
               </span>
@@ -285,7 +331,11 @@ function DetailItem({ label, children }) {
 
 export default function Players() {
   const { user } = useAuth();
-  const canAction = user?.email?.toLowerCase() === ALLOWED_ACTION;
+
+  // فحص الصلاحيات من الإيميلات المخزنة بملف البيئة
+  const currentUserEmail = user?.email?.toLowerCase();
+  const canAction = currentUserEmail === ALLOWED_ACTION_EMAIL;
+  const canPaidAction = currentUserEmail === ALLOWED_PAID_EMAIL;
 
   const [loadingFetch, errorFetch, players] = useFetch();
   const [localPlayers, setLocalPlayers] = useState([]);
@@ -298,7 +348,7 @@ export default function Players() {
     stage: "",
     church: "",
     team: "",
-    paid: "",   // "" | "paid" | "unpaid"
+    paid: "",
   });
 
   useEffect(() => {
@@ -313,15 +363,21 @@ export default function Players() {
   };
 
   const resetFilters = () => {
-    setFilter({ gender: "", game: "", form: "", stage: "", church: "", team: "", paid: "" });
+    setFilter({
+      gender: "",
+      game: "",
+      form: "",
+      stage: "",
+      church: "",
+      team: "",
+      paid: "",
+    });
     setCurrentPage(1);
   };
 
-  // ── تحديث paid محلياً بعد نجاح Firestore ─────────────────────
-
   const handlePaidToggle = (playerId, newPaid) => {
     setLocalPlayers((prev) =>
-      prev.map((p) => (p.id === playerId ? { ...p, paid: newPaid } : p))
+      prev.map((p) => (p.id === playerId ? { ...p, paid: newPaid } : p)),
     );
   };
 
@@ -442,14 +498,22 @@ export default function Players() {
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-      { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 10 }, { wch: 15 },
-      { wch: 20 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
-      { wch: 20 }, { wch: 15 },
+      { wch: 5 },
+      { wch: 25 },
+      { wch: 18 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 35 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 15 },
     ];
 
-    // تلوين خلايا "دفع الاشتراك" — أخضر للدافع، أحمر للمتأخر
     const range = XLSX.utils.decode_range(ws["!ref"]);
-    const paidColIdx = 11; // عمود "دفع الاشتراك" (0-indexed)
+    const paidColIdx = 11;
     for (let R = range.s.r + 1; R <= range.e.r; R++) {
       const cellAddr = XLSX.utils.encode_cell({ r: R, c: paidColIdx });
       if (!ws[cellAddr]) continue;
@@ -468,8 +532,6 @@ export default function Players() {
     toast.success("تم تحميل Excel ✅");
   }
 
-  // ── حالات التحميل والخطأ ─────────────────────────────────────
-
   if (loadingFetch) {
     return (
       <div className="flex justify-center items-center py-24" role="status">
@@ -480,7 +542,9 @@ export default function Players() {
 
   if (errorFetch) {
     return (
-      <div role="alert" className="flex flex-col items-center gap-3 py-20 text-center">
+      <div
+        role="alert"
+        className="flex flex-col items-center gap-3 py-20 text-center">
         <span className="text-4xl">⚠️</span>
         <p className="text-red-500 font-semibold">{errorFetch}</p>
       </div>
@@ -490,21 +554,28 @@ export default function Players() {
   if (localPlayers.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
-        <svg className="w-16 h-16 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        <svg
+          className="w-16 h-16 text-slate-200"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+          />
         </svg>
-        <p className="text-lg font-semibold text-slate-500">لا يوجد لاعبين مسجلين بعد</p>
+        <p className="text-lg font-semibold text-slate-500">
+          لا يوجد لاعبين مسجلين بعد
+        </p>
         <p className="text-sm">ابدأ بتسجيل اللاعبين من الصفحة الرئيسية</p>
       </div>
     );
   }
 
-  // ── الواجهة الرئيسية ──────────────────────────────────────────
-
   return (
     <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
-
       {/* ═══ شريط الفلاتر ═══════════════════════════════════════ */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
         <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">
@@ -559,12 +630,21 @@ export default function Players() {
             disabled={!isFiltered}
             title="مسح جميع الفلاتر"
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-              isFiltered
-                ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
-                : "bg-slate-100 text-slate-300 cursor-not-allowed"
+              isFiltered ?
+                "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+              : "bg-slate-100 text-slate-300 cursor-not-allowed"
             }`}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
             مسح
           </button>
@@ -575,10 +655,15 @@ export default function Players() {
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4 px-1">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-blue-700 inline-block"></span>
-          <p className="text-sm font-semibold text-slate-700" aria-live="polite">
+          <p
+            className="text-sm font-semibold text-slate-700"
+            aria-live="polite">
             {filteredPlayers.length} لاعب
             {isFiltered && (
-              <span className="text-slate-400 font-normal"> من {localPlayers.length}</span>
+              <span className="text-slate-400 font-normal">
+                {" "}
+                من {localPlayers.length}
+              </span>
             )}
           </p>
         </div>
@@ -589,13 +674,21 @@ export default function Players() {
               onClick={handleExportExcel}
               disabled={filteredPlayers.length === 0}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                filteredPlayers.length === 0
-                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
+                filteredPlayers.length === 0 ?
+                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
               }`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
               Excel
             </button>
@@ -604,13 +697,21 @@ export default function Players() {
               onClick={handleDeleteAll}
               disabled={deletingAll || localPlayers.length === 0}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                deletingAll || localPlayers.length === 0
-                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                  : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+                deletingAll || localPlayers.length === 0 ?
+                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
               }`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
               {deletingAll ? "جاري الحذف..." : "مسح الكل"}
             </button>
@@ -619,16 +720,24 @@ export default function Players() {
       </div>
 
       {/* ═══ قائمة اللاعبين ══════════════════════════════════════ */}
-      {filteredPlayers.length === 0 ? (
+      {filteredPlayers.length === 0 ?
         <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
-          <svg className="w-10 h-10 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="w-10 h-10 text-slate-200"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <p className="font-semibold text-slate-500">لا توجد نتائج</p>
           <p className="text-sm">حاول تغيير الفلتر أو مسحه</p>
         </div>
-      ) : (
-        <>
+      : <>
           <div className="flex flex-col gap-2 pb-4">
             {paginatedPlayers.map((player, index) => (
               <PlayerCard
@@ -636,6 +745,7 @@ export default function Players() {
                 player={player}
                 index={(currentPage - 1) * ITEMS_PER_PAGE + index}
                 canAction={canAction}
+                canPaidAction={canPaidAction}
                 onDelete={handleDeleteItem}
                 onPaidToggle={handlePaidToggle}
               />
@@ -647,7 +757,7 @@ export default function Players() {
             onPageChange={setCurrentPage}
           />
         </>
-      )}
+      }
     </div>
   );
 }

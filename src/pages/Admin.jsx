@@ -21,7 +21,7 @@ import { db } from "../utils/firebase";
 // ─── المكون الرئيسي ────────────────────────────────────────────────
 
 export default function Admin() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
   const [loadingFetch, errorFetch, rawPlayers] = useFetch();
@@ -297,7 +297,7 @@ export default function Admin() {
     <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
       {/* ═══ رأس الصفحة ══════════════════════════════════════════ */}
       <div className="flex justify-between items-center bg-blue-700 text-white px-5 py-3.5 rounded-2xl shadow-md mb-5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <svg
             className="w-5 h-5 text-blue-200"
             fill="none"
@@ -310,7 +310,12 @@ export default function Admin() {
               d="M13 10V3L4 14h7v7l9-11h-7z"
             />
           </svg>
-          <h1 className="text-base font-bold">لوحة الأدمن</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5">
+            <h1 className="text-base font-bold leading-none">لوحة الأدمن</h1>
+            <span className="text-xs text-white font-mono bg-blue-900 px-2.5 py-0.5 rounded-full border border-blue-600/30">
+              {user?.email}
+            </span>
+          </div>
         </div>
 
         <button
@@ -318,7 +323,7 @@ export default function Admin() {
             logout();
             navigate("/login");
           }}
-          className="flex items-center text-xs px-3.5 py-1.5 rounded-full font-semibold bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer">
+          className="flex items-center text-xs px-3.5 py-1.5 rounded-full font-semibold bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer flex-shrink-0">
           <svg
             className="w-3.5 h-3.5"
             fill="none"
