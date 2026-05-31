@@ -28,7 +28,6 @@ import { db } from "../utils/firebase";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 // ─── جلب الثوابت من ملف الـ .env ──────────────────────────────────
-// ملاحظة: لو شغال Create React App استبدل import.meta.env بـ process.env.REACT_APP_
 const ALLOWED_ACTION_EMAIL = import.meta.env.VITE_ALLOWED_ACTION?.toLowerCase();
 const ALLOWED_PAID_EMAIL = import.meta.env.VITE_ALLOWED_PAID?.toLowerCase();
 const ITEMS_PER_PAGE = 20;
@@ -96,7 +95,7 @@ function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
 
   const handleChange = async (e) => {
     e.stopPropagation();
-    if (!canPaidAction) return; // حماية إضافية
+    if (!canPaidAction) return;
     setLoading(true);
     try {
       await updateDoc(doc(db, "players", playerId), { paid: !paid });
@@ -111,7 +110,6 @@ function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
     }
   };
 
-  // إذا لم يكن له صلاحية التعديل، يظهر كـ شارة (Badge) عادية فقط بدون إمكانية الضغط
   if (!canPaidAction) {
     return (
       <span
@@ -188,34 +186,39 @@ function PlayerCard({
   const color = avatarColor(player.name);
   const initials = getInitials(player.name);
 
+  const handleToggle = () => {
+    if (window.getSelection()?.toString()) return;
+    setExpanded((v) => !v);
+  };
+
   return (
     <div
       className={`bg-white border rounded-2xl overflow-hidden transition-all duration-200 ${
         expanded ? "border-blue-300 shadow-sm border-2" : "border-slate-200"
       }`}>
       <div
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none hover:bg-slate-50 transition-colors"
-        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors"
+        onClick={handleToggle}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === "Enter" && setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`تفاصيل ${player.name}`}>
-        <span className="text-xs text-slate-400 w-6 text-center flex-shrink-0 font-mono font-bold">
+        <span className="text-xs text-slate-400 w-6 text-center flex-shrink-0 font-mono font-bold select-none">
           {index + 1}
         </span>
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 select-none"
           style={{ background: color.bg, color: color.text }}
           aria-hidden="true">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-900 truncate leading-tight">
+          <p className="text-sm font-semibold text-slate-900 truncate leading-tight select-text">
             {player.name}
           </p>
           <p
-            className="text-sm font-bold font-mono text-rose-700 truncate mt-0.5"
+            className="text-sm font-bold font-mono text-rose-700 truncate mt-0.5 select-text"
             dir="rtl">
             {player.nationalId || "—"}
           </p>
@@ -236,7 +239,7 @@ function PlayerCard({
         </div>
 
         <svg
-          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 select-none ${expanded ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -318,9 +321,9 @@ function PlayerCard({
   );
 }
 
-function DetailItem({ label, children }) {
+function DetailItem({ label, children, className = "" }) {
   return (
-    <div>
+    <div className={`select-text ${className}`}>
       <p className="text-blue-700 mb-0.5 text-sm font-medium">{label}</p>
       <div className="text-slate-700 font-black text-xs">{children}</div>
     </div>
@@ -332,7 +335,6 @@ function DetailItem({ label, children }) {
 export default function Players() {
   const { user } = useAuth();
 
-  // فحص الصلاحيات من الإيميلات المخزنة بملف البيئة
   const currentUserEmail = user?.email?.toLowerCase();
   const canAction = currentUserEmail === ALLOWED_ACTION_EMAIL;
   const canPaidAction = currentUserEmail === ALLOWED_PAID_EMAIL;

@@ -170,7 +170,7 @@ export default function NationalIdInput({
                 aria-label={`الرقم القومى - الخانة ${i + 1} من ${ID_LENGTH}`}
                 className={`
                   w-9 h-11 text-center text-lg font-bold rounded-lg border-2 outline-none
-                  transition-all duration-150 select-none
+                  transition-all duration-150 select-all
                   ${
                     digits[i] ?
                       error && isComplete ?
