@@ -1,14 +1,3 @@
-/**
- * Players.jsx
- * ─────────────────────────────────────────────────────────────────
- * صفحة عرض اللاعبين المسجلين مع إمكانية الفلترة، الحذف، وتصدير Excel.
- * - تستخدم useFetch لجلب البيانات من Firestore.
- * - تستخدم XLSX من SheetJS لتصدير البيانات.
- * - يحق للمستخدم المُصرَّح له فقط الحذف والتصدير أو تحديث الدفع بناءً على الصلاحيات.
- * - checkbox لتحديد دفع اشتراك اللاعب (paid) مع تحديث Firestore فوري.
- * ─────────────────────────────────────────────────────────────────
- */
-
 import React, { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 import Loader from "../components/Loader";
@@ -23,6 +12,8 @@ import {
   getDocs,
   collection,
   updateDoc,
+  getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../utils/firebase";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
@@ -343,6 +334,12 @@ export default function Players() {
   const [localPlayers, setLocalPlayers] = useState([]);
   const [deletingAll, setDeletingAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // ── حالة غلق التسجيل ──────────────────────────────────────────
+  const [registrationClosed, setRegistrationClosed] = useState(false);
+  const [loadingRegStatus, setLoadingRegStatus] = useState(true);
+  const [togglingReg, setTogglingReg] = useState(false);
+
   const [filter, setFilter] = useState({
     gender: "",
     game: "",
@@ -352,6 +349,41 @@ export default function Players() {
     team: "",
     paid: "",
   });
+
+  // ── جلب حالة التسجيل من Firestore ─────────────────────────────
+  useEffect(() => {
+    const fetchRegStatus = async () => {
+      try {
+        const snap = await getDoc(doc(db, "settings", "registration"));
+        if (snap.exists()) {
+          setRegistrationClosed(snap.data().closed === true);
+        }
+      } catch {
+        // لو فشل نفترض مفتوح
+      } finally {
+        setLoadingRegStatus(false);
+      }
+    };
+    fetchRegStatus();
+  }, []);
+
+  // ── تبديل حالة التسجيل ────────────────────────────────────────
+  const handleToggleRegistration = async () => {
+    if (!canAction) return;
+    const newVal = !registrationClosed;
+    setTogglingReg(true);
+    try {
+      await setDoc(doc(db, "settings", "registration"), { closed: newVal });
+      setRegistrationClosed(newVal);
+      toast.success(newVal ? "🔒 تم غلق التسجيل" : "🔓 تم فتح التسجيل", {
+        duration: 3000,
+      });
+    } catch {
+      toast.error("فشل تغيير حالة التسجيل");
+    } finally {
+      setTogglingReg(false);
+    }
+  };
 
   useEffect(() => {
     setLocalPlayers(players);
@@ -556,6 +588,16 @@ export default function Players() {
   if (localPlayers.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
+        {/* ── زرار غلق/فتح التسجيل حتى لو مفيش لاعبين ── */}
+        {canAction && (
+          <div className="mb-4">
+            <RegistrationToggleButton
+              closed={registrationClosed}
+              loading={loadingRegStatus || togglingReg}
+              onToggle={handleToggleRegistration}
+            />
+          </div>
+        )}
         <svg
           className="w-16 h-16 text-slate-200"
           fill="none"
@@ -671,7 +713,14 @@ export default function Players() {
         </div>
 
         {canAction && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* ── زرار غلق/فتح التسجيل ── */}
+            <RegistrationToggleButton
+              closed={registrationClosed}
+              loading={loadingRegStatus || togglingReg}
+              onToggle={handleToggleRegistration}
+            />
+
             <button
               onClick={handleExportExcel}
               disabled={filteredPlayers.length === 0}
@@ -761,5 +810,58 @@ export default function Players() {
         </>
       }
     </div>
+  );
+}
+
+// ─── زرار غلق/فتح التسجيل ────────────────────────────────────────
+
+function RegistrationToggleButton({ closed, loading, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={loading}
+      title={closed ? "فتح التسجيل" : "غلق التسجيل"}
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-200 ${
+        loading ? "bg-slate-50 text-slate-300 border-slate-200 cursor-wait"
+        : closed ?
+          "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-700 hover:text-white cursor-pointer"
+        : "bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-700 hover:text-white cursor-pointer"
+      }`}>
+      {loading ?
+        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+      : closed ?
+        /* أيقونة قفل مفتوح — اضغط لفتح التسجيل */
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+          />
+        </svg>
+      : /* أيقونة قفل مغلق — اضغط لغلق التسجيل */
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7a4 4 0 00-8 0v4h8V7z"
+          />
+        </svg>
+      }
+      {loading ?
+        "..."
+      : closed ?
+        "فتح التسجيل"
+      : "غلق التسجيل"}
+    </button>
   );
 }
