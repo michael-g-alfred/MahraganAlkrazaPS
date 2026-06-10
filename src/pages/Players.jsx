@@ -4,6 +4,7 @@ import Loader from "../components/Loader";
 import useFetch from "../hooks/useFetch";
 import SelectBox from "../components/SelectBox";
 import Pagination from "../components/Pagination";
+import EditPlayerModal from "../components/EditPlayerModal";
 import { useAuth } from "../context/AuthContext";
 import {
   doc,
@@ -18,12 +19,9 @@ import {
 import { db } from "../utils/firebase";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
-// ─── جلب الثوابت من ملف الـ .env ──────────────────────────────────
 const ALLOWED_ACTION_EMAIL = import.meta.env.VITE_ALLOWED_ACTION?.toLowerCase();
 const ALLOWED_PAID_EMAIL = import.meta.env.VITE_ALLOWED_PAID?.toLowerCase();
 const ITEMS_PER_PAGE = 20;
-
-// ─── مساعدات الأفاتار ──────────────────────────────────────────────
 
 function getInitials(name = "") {
   const parts = name.trim().split(" ").filter(Boolean);
@@ -46,8 +44,6 @@ function avatarColor(name = "") {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
-
-// ─── مكونات الشارات ──────────────────────────────────────────────
 
 function GenderBadge({ gender }) {
   if (gender === "بنين")
@@ -78,8 +74,6 @@ function FormBadge({ form }) {
     </span>
   );
 }
-
-// ─── Paid Checkbox / Badge ────────────────────────────────────────
 
 function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
   const [loading, setLoading] = useState(false);
@@ -133,37 +127,17 @@ function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
       {loading ?
         <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
       : paid ?
-        <svg
-          className="w-3 h-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
-      : <svg
-          className="w-3 h-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M6 18L18 6M6 6l12 12"
-          />
+      : <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       }
       {paid ? "دفع" : "لم يدفع"}
     </button>
   );
 }
-
-// ─── مكون كارت اللاعب ─────────────────────────────────────────────
 
 function PlayerCard({
   player,
@@ -172,6 +146,7 @@ function PlayerCard({
   canPaidAction,
   onDelete,
   onPaidToggle,
+  onEdit,
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = avatarColor(player.name);
@@ -215,8 +190,24 @@ function PlayerCard({
           </p>
         </div>
 
-        {/* ── Paid badge + gender/form ── */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* ── زرار التعديل — يظهر فقط لـ canAction ── */}
+          {canAction && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(player);
+              }}
+              title="تعديل بيانات اللاعب"
+              aria-label={`تعديل بيانات ${player.name}`}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all duration-200 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-700 hover:text-white flex-shrink-0">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              تعديل
+            </button>
+          )}
           <PaidCheckbox
             playerId={player.id}
             paid={!!player.paid}
@@ -236,11 +227,7 @@ function PlayerCard({
           stroke="currentColor"
           strokeWidth={2}
           aria-hidden="true">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </div>
 
@@ -252,9 +239,7 @@ function PlayerCard({
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
             <DetailItem label="المرحلة">{player.stage || "—"}</DetailItem>
-            <DetailItem label="تاريخ الميلاد">
-              {player.birthdate || "—"}
-            </DetailItem>
+            <DetailItem label="تاريخ الميلاد">{player.birthdate || "—"}</DetailItem>
             <DetailItem label="اللعبة">{player.game || "—"}</DetailItem>
             <DetailItem label="التليفون">
               <span className="font-mono">{player.phone || "—"}</span>
@@ -272,9 +257,7 @@ function PlayerCard({
             <DetailItem label="حالة الاشتراك">
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium ${
-                  player.paid ?
-                    "bg-emerald-100 text-emerald-800"
-                  : "bg-red-50 text-red-600"
+                  player.paid ? "bg-emerald-100 text-emerald-800" : "bg-red-50 text-red-600"
                 }`}>
                 {player.paid ? "✓ دفع الاشتراك" : "✗ لم يدفع بعد"}
               </span>
@@ -291,17 +274,8 @@ function PlayerCard({
                          text-red-600 bg-red-50 border border-red-200 text-xs font-semibold
                          hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200"
               aria-label={`حذف اللاعب ${player.name}`}>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               حذف اللاعب
             </button>
@@ -321,8 +295,6 @@ function DetailItem({ label, children, className = "" }) {
   );
 }
 
-// ─── المكون الرئيسي ────────────────────────────────────────────────
-
 export default function Players() {
   const { user } = useAuth();
 
@@ -334,6 +306,9 @@ export default function Players() {
   const [localPlayers, setLocalPlayers] = useState([]);
   const [deletingAll, setDeletingAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // ── حالة مودال التعديل ─────────────────────────────────────────
+  const [editingPlayer, setEditingPlayer] = useState(null);
 
   // ── حالة غلق التسجيل ──────────────────────────────────────────
   const [registrationClosed, setRegistrationClosed] = useState(false);
@@ -350,7 +325,6 @@ export default function Players() {
     paid: "",
   });
 
-  // ── جلب حالة التسجيل من Firestore ─────────────────────────────
   useEffect(() => {
     const fetchRegStatus = async () => {
       try {
@@ -359,7 +333,7 @@ export default function Players() {
           setRegistrationClosed(snap.data().closed === true);
         }
       } catch {
-        // لو فشل نفترض مفتوح
+        // ignore
       } finally {
         setLoadingRegStatus(false);
       }
@@ -367,7 +341,6 @@ export default function Players() {
     fetchRegStatus();
   }, []);
 
-  // ── تبديل حالة التسجيل ────────────────────────────────────────
   const handleToggleRegistration = async () => {
     if (!canAction) return;
     const newVal = !registrationClosed;
@@ -375,9 +348,7 @@ export default function Players() {
     try {
       await setDoc(doc(db, "settings", "registration"), { closed: newVal });
       setRegistrationClosed(newVal);
-      toast.success(newVal ? "🔒 تم غلق التسجيل" : "🔓 تم فتح التسجيل", {
-        duration: 3000,
-      });
+      toast.success(newVal ? "🔒 تم غلق التسجيل" : "🔓 تم فتح التسجيل", { duration: 3000 });
     } catch {
       toast.error("فشل تغيير حالة التسجيل");
     } finally {
@@ -397,15 +368,7 @@ export default function Players() {
   };
 
   const resetFilters = () => {
-    setFilter({
-      gender: "",
-      game: "",
-      form: "",
-      stage: "",
-      church: "",
-      team: "",
-      paid: "",
-    });
+    setFilter({ gender: "", game: "", form: "", stage: "", church: "", team: "", paid: "" });
     setCurrentPage(1);
   };
 
@@ -415,7 +378,12 @@ export default function Players() {
     );
   };
 
-  // ── حساب البيانات المعروضة ────────────────────────────────────
+  // ── تحديث اللاعب بعد التعديل ──────────────────────────────────
+  const handlePlayerSaved = (updatedPlayer) => {
+    setLocalPlayers((prev) =>
+      prev.map((p) => (p.id === updatedPlayer.id ? { ...p, ...updatedPlayer } : p)),
+    );
+  };
 
   const filteredPlayers = useMemo(
     () =>
@@ -440,45 +408,20 @@ export default function Players() {
     return filteredPlayers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredPlayers, currentPage]);
 
-  // ── خيارات الفلاتر ────────────────────────────────────────────
-
-  const genders = useMemo(
-    () => [...new Set(localPlayers.map((p) => p.gender).filter(Boolean))],
-    [localPlayers],
-  );
-  const games = useMemo(
-    () => [...new Set(localPlayers.map((p) => p.game).filter(Boolean))],
-    [localPlayers],
-  );
-  const stages = useMemo(
-    () => [...new Set(localPlayers.map((p) => p.stage).filter(Boolean))],
-    [localPlayers],
-  );
-  const churches = useMemo(
-    () => [...new Set(localPlayers.map((p) => p.church).filter(Boolean))],
-    [localPlayers],
-  );
-  const forms = useMemo(
-    () => [...new Set(localPlayers.map((p) => p.form).filter(Boolean))],
-    [localPlayers],
-  );
-  const teams = useMemo(
-    () => [...new Set(localPlayers.map((p) => p.team).filter(Boolean))],
-    [localPlayers],
-  );
-
-  // ── دوال الأكشن ───────────────────────────────────────────────
+  const genders = useMemo(() => [...new Set(localPlayers.map((p) => p.gender).filter(Boolean))], [localPlayers]);
+  const games = useMemo(() => [...new Set(localPlayers.map((p) => p.game).filter(Boolean))], [localPlayers]);
+  const stages = useMemo(() => [...new Set(localPlayers.map((p) => p.stage).filter(Boolean))], [localPlayers]);
+  const churches = useMemo(() => [...new Set(localPlayers.map((p) => p.church).filter(Boolean))], [localPlayers]);
+  const forms = useMemo(() => [...new Set(localPlayers.map((p) => p.form).filter(Boolean))], [localPlayers]);
+  const teams = useMemo(() => [...new Set(localPlayers.map((p) => p.team).filter(Boolean))], [localPlayers]);
 
   function handleDeleteItem(player) {
     if (!window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) return;
-
     const backup = [...localPlayers];
     setLocalPlayers((prev) => prev.filter((x) => x.id !== player.id));
-
     if (paginatedPlayers.length === 1 && currentPage > 1) {
       setCurrentPage((prev) => prev - 1);
     }
-
     deleteDoc(doc(db, "players", player.id))
       .then(() => toast.success("تم حذف اللاعب ✅"))
       .catch(() => {
@@ -488,18 +431,11 @@ export default function Players() {
   }
 
   async function handleDeleteAll() {
-    if (
-      !window.confirm(
-        `⚠️ حذف جميع اللاعبين (${localPlayers.length})؟ لا يمكن التراجع!`,
-      )
-    )
-      return;
-
+    if (!window.confirm(`⚠️ حذف جميع اللاعبين (${localPlayers.length})؟ لا يمكن التراجع!`)) return;
     setDeletingAll(true);
     const backup = [...localPlayers];
     setLocalPlayers([]);
     setCurrentPage(1);
-
     try {
       const snapshot = await getDocs(collection(db, "players"));
       const batch = writeBatch(db);
@@ -529,36 +465,11 @@ export default function Players() {
       "اسم الفريق": p.team || "",
       "دفع الاشتراك": p.paid ? "دفع ✓" : "لم يدفع ✗",
     }));
-
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-      { wch: 5 },
-      { wch: 25 },
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 35 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 20 },
-      { wch: 15 },
+      { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 10 }, { wch: 15 },
+      { wch: 20 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
     ];
-
-    const range = XLSX.utils.decode_range(ws["!ref"]);
-    const paidColIdx = 11;
-    for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      const cellAddr = XLSX.utils.encode_cell({ r: R, c: paidColIdx });
-      if (!ws[cellAddr]) continue;
-      const isPaid = filteredPlayers[R - 1]?.paid;
-      ws[cellAddr].s = {
-        fill: { fgColor: { rgb: isPaid ? "C6EFCE" : "FFC7CE" } },
-        font: { color: { rgb: isPaid ? "276221" : "9C0006" }, bold: true },
-        alignment: { horizontal: "center" },
-      };
-    }
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "اللاعبين");
     const fileName = `اللاعبين_${new Date().toLocaleDateString("ar-EG").replace(/\//g, "-")}.xlsx`;
@@ -576,9 +487,7 @@ export default function Players() {
 
   if (errorFetch) {
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-center gap-3 py-20 text-center">
+      <div role="alert" className="flex flex-col items-center gap-3 py-20 text-center">
         <span className="text-4xl">⚠️</span>
         <p className="text-red-500 font-semibold">{errorFetch}</p>
       </div>
@@ -588,7 +497,6 @@ export default function Players() {
   if (localPlayers.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
-        {/* ── زرار غلق/فتح التسجيل حتى لو مفيش لاعبين ── */}
         {canAction && (
           <div className="mb-4">
             <RegistrationToggleButton
@@ -598,21 +506,10 @@ export default function Players() {
             />
           </div>
         )}
-        <svg
-          className="w-16 h-16 text-slate-200"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-          />
+        <svg className="w-16 h-16 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-        <p className="text-lg font-semibold text-slate-500">
-          لا يوجد لاعبين مسجلين بعد
-        </p>
+        <p className="text-lg font-semibold text-slate-500">لا يوجد لاعبين مسجلين بعد</p>
         <p className="text-sm">ابدأ بتسجيل اللاعبين من الصفحة الرئيسية</p>
       </div>
     );
@@ -620,55 +517,28 @@ export default function Players() {
 
   return (
     <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
-      {/* ═══ شريط الفلاتر ═══════════════════════════════════════ */}
+      {/* مودال التعديل */}
+      {editingPlayer && (
+        <EditPlayerModal
+          player={editingPlayer}
+          onClose={() => setEditingPlayer(null)}
+          onSaved={handlePlayerSaved}
+        />
+      )}
+
+      {/* شريط الفلاتر */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
         <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">
           فلترة النتائج
         </p>
         <div className="flex flex-wrap gap-2" role="search">
-          <SelectBox
-            label="النوع"
-            value={filter.gender}
-            onChange={(e) => handleFilterChange("gender", e.target.value)}
-            options={genders}
-          />
-          <SelectBox
-            label="المرحلة"
-            value={filter.stage}
-            onChange={(e) => handleFilterChange("stage", e.target.value)}
-            options={stages}
-          />
-          <SelectBox
-            label="اللعبة"
-            value={filter.game}
-            onChange={(e) => handleFilterChange("game", e.target.value)}
-            options={games}
-          />
-          <SelectBox
-            label="الكنيسة"
-            value={filter.church}
-            onChange={(e) => handleFilterChange("church", e.target.value)}
-            options={churches}
-          />
-          <SelectBox
-            label="الإستمارة"
-            value={filter.form}
-            onChange={(e) => handleFilterChange("form", e.target.value)}
-            options={forms}
-          />
-          <SelectBox
-            label="الفريق"
-            value={filter.team}
-            onChange={(e) => handleFilterChange("team", e.target.value)}
-            options={teams}
-          />
-          <SelectBox
-            label="الاشتراك"
-            value={filter.paid}
-            onChange={(e) => handleFilterChange("paid", e.target.value)}
-            options={["دفعوا فقط", "لم يدفعوا فقط"]}
-          />
-
+          <SelectBox label="النوع" value={filter.gender} onChange={(e) => handleFilterChange("gender", e.target.value)} options={genders} />
+          <SelectBox label="المرحلة" value={filter.stage} onChange={(e) => handleFilterChange("stage", e.target.value)} options={stages} />
+          <SelectBox label="اللعبة" value={filter.game} onChange={(e) => handleFilterChange("game", e.target.value)} options={games} />
+          <SelectBox label="الكنيسة" value={filter.church} onChange={(e) => handleFilterChange("church", e.target.value)} options={churches} />
+          <SelectBox label="الإستمارة" value={filter.form} onChange={(e) => handleFilterChange("form", e.target.value)} options={forms} />
+          <SelectBox label="الفريق" value={filter.team} onChange={(e) => handleFilterChange("team", e.target.value)} options={teams} />
+          <SelectBox label="الاشتراك" value={filter.paid} onChange={(e) => handleFilterChange("paid", e.target.value)} options={["دفعوا فقط", "لم يدفعوا فقط"]} />
           <button
             onClick={resetFilters}
             disabled={!isFiltered}
@@ -678,49 +548,33 @@ export default function Players() {
                 "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
               : "bg-slate-100 text-slate-300 cursor-not-allowed"
             }`}>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
             مسح
           </button>
         </div>
       </div>
 
-      {/* ═══ شريط الإحصاء والأزرار ══════════════════════════════ */}
+      {/* شريط الإحصاء والأزرار */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4 px-1">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-blue-700 inline-block"></span>
-          <p
-            className="text-sm font-semibold text-slate-700"
-            aria-live="polite">
+          <p className="text-sm font-semibold text-slate-700" aria-live="polite">
             {filteredPlayers.length} لاعب
             {isFiltered && (
-              <span className="text-slate-400 font-normal">
-                {" "}
-                من {localPlayers.length}
-              </span>
+              <span className="text-slate-400 font-normal"> من {localPlayers.length}</span>
             )}
           </p>
         </div>
 
         {canAction && (
           <div className="flex items-center gap-2 flex-wrap">
-            {/* ── زرار غلق/فتح التسجيل ── */}
             <RegistrationToggleButton
               closed={registrationClosed}
               loading={loadingRegStatus || togglingReg}
               onToggle={handleToggleRegistration}
             />
-
             <button
               onClick={handleExportExcel}
               disabled={filteredPlayers.length === 0}
@@ -729,21 +583,11 @@ export default function Players() {
                   "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
                 : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
               }`}>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               Excel
             </button>
-
             <button
               onClick={handleDeleteAll}
               disabled={deletingAll || localPlayers.length === 0}
@@ -752,17 +596,8 @@ export default function Players() {
                   "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
                 : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
               }`}>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               {deletingAll ? "جاري الحذف..." : "مسح الكل"}
             </button>
@@ -770,20 +605,11 @@ export default function Players() {
         )}
       </div>
 
-      {/* ═══ قائمة اللاعبين ══════════════════════════════════════ */}
+      {/* قائمة اللاعبين */}
       {filteredPlayers.length === 0 ?
         <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
-          <svg
-            className="w-10 h-10 text-slate-200"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
+          <svg className="w-10 h-10 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <p className="font-semibold text-slate-500">لا توجد نتائج</p>
           <p className="text-sm">حاول تغيير الفلتر أو مسحه</p>
@@ -799,6 +625,7 @@ export default function Players() {
                 canPaidAction={canPaidAction}
                 onDelete={handleDeleteItem}
                 onPaidToggle={handlePaidToggle}
+                onEdit={setEditingPlayer}
               />
             ))}
           </div>
@@ -812,8 +639,6 @@ export default function Players() {
     </div>
   );
 }
-
-// ─── زرار غلق/فتح التسجيل ────────────────────────────────────────
 
 function RegistrationToggleButton({ closed, loading, onToggle }) {
   return (
@@ -830,38 +655,14 @@ function RegistrationToggleButton({ closed, loading, onToggle }) {
       {loading ?
         <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
       : closed ?
-        /* أيقونة قفل مفتوح — اضغط لفتح التسجيل */
-        <svg
-          className="w-3.5 h-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-          />
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
         </svg>
-      : /* أيقونة قفل مغلق — اضغط لغلق التسجيل */
-        <svg
-          className="w-3.5 h-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7a4 4 0 00-8 0v4h8V7z"
-          />
+      : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7a4 4 0 00-8 0v4h8V7z" />
         </svg>
       }
-      {loading ?
-        "..."
-      : closed ?
-        "فتح التسجيل"
-      : "غلق التسجيل"}
+      {loading ? "..." : closed ? "فتح التسجيل" : "غلق التسجيل"}
     </button>
   );
 }
