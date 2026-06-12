@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import usePlayerSave from "../hooks/usePlayerSave";
 import Card from "../components/Card";
 import ReviewModal from "../components/ReviewModal";
+import MultipleSingle from "./MultipleSingle";
 import {
   validateBirthdate,
   validateNameUnique,
@@ -10,6 +11,9 @@ import {
 
 export default function Single({ data, onUpdateSelection }) {
   const { loading, savePlayer } = usePlayerSave(data, onUpdateSelection);
+
+  // وضع التسجيل: "one" = لاعب واحد، "multi" = أكثر من لاعب
+  const [mode, setMode] = useState("one");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -23,7 +27,6 @@ export default function Single({ data, onUpdateSelection }) {
   const [checkingName, setCheckingName] = useState(false);
   const [nationalIdValid, setNationalIdValid] = useState(false);
 
-  // ── حالة مودال المراجعة ─────────────────────────────────────
   const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
@@ -71,7 +74,6 @@ export default function Single({ data, onUpdateSelection }) {
     nationalIdValid &&
     !loading;
 
-  // ── فتح المراجعة بدلاً من الإرسال المباشر ───────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -84,11 +86,9 @@ export default function Single({ data, onUpdateSelection }) {
     const nameErr = await validateNameUnique(formData.name, data);
     if (nameErr) { setNameError(nameErr); return; }
 
-    // فتح مودال المراجعة
     setShowReview(true);
   };
 
-  // ── تأكيد التسجيل الفعلي من المودال ─────────────────────────
   const handleConfirmSave = async () => {
     await savePlayer({
       name: formData.name,
@@ -103,9 +103,20 @@ export default function Single({ data, onUpdateSelection }) {
     setBirthdateError(null);
   };
 
+  // ── وضع التسجيل المتعدد ────────────────────────────────────────
+  if (mode === "multi") {
+    return (
+      <MultipleSingle
+        data={data}
+        onUpdateSelection={onUpdateSelection}
+        onBack={() => setMode("one")}
+      />
+    );
+  }
+
+  // ── وضع التسجيل الفردي (الوضع الافتراضي) ───────────────────────
   return (
     <>
-      {/* مودال المراجعة */}
       {showReview && (
         <ReviewModal
           selectionData={data}
@@ -125,16 +136,29 @@ export default function Single({ data, onUpdateSelection }) {
         <div className="bg-white border-2 border-blue-700 rounded-3xl overflow-hidden shadow-sm">
           {/* رأس النموذج */}
           <div className="bg-blue-700 px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-base">بيانات اللاعب</h3>
+                  <p className="text-blue-200 text-xs">استمارة تسجيل فردي</p>
+                </div>
+              </div>
+
+              {/* زرار تسجيل أكثر من لاعب */}
+              <button
+                type="button"
+                onClick={() => setMode("multi")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/30 text-white text-xs font-semibold transition border border-white/30">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-base">بيانات اللاعب</h3>
-                <p className="text-blue-200 text-xs">استمارة تسجيل فردي</p>
-              </div>
+                أكثر من لاعب؟
+              </button>
             </div>
           </div>
 
@@ -160,28 +184,28 @@ export default function Single({ data, onUpdateSelection }) {
               </div>
             )}
 
-            {/* زر المراجعة قبل التسجيل */}
             <button
               type="submit"
               disabled={!isFormValid}
               aria-disabled={!isFormValid}
               className={`mt-6 w-full rounded-xl py-3.5 font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-                !isFormValid ?
-                  "bg-slate-100 text-slate-400 cursor-not-allowed"
-                : "bg-blue-700 text-white hover:bg-blue-800 shadow-sm hover:shadow-md"
+                !isFormValid
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "bg-blue-700 text-white hover:bg-blue-800 shadow-sm hover:shadow-md"
               }`}>
-              {loading ?
+              {loading ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   جارٍ الحفظ...
                 </>
-              : <>
+              ) : (
+                <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                   مراجعة وتسجيل
                 </>
-              }
+              )}
             </button>
           </div>
         </div>
