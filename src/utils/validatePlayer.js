@@ -4,8 +4,8 @@ import { db } from "./firebase";
 
 export function validateQuadName(name) {
   if (!name?.trim()) return null;
-  const regex = /^[\u0600-\u06FF]+([ ][\u0600-\u06FF]+){3}$/;
-  if (!regex.test(name.trim())) return "الإسم يجب أن يكون رباعياً";
+  const regex = /^[\u0600-\u06FF]+([ ][\u0600-\u06FF]+){3,}$/;
+  if (!regex.test(name.trim())) return "الإسم يجب أن يكون رباعياً على الأقل";
   return null;
 }
 

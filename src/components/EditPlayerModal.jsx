@@ -212,9 +212,10 @@ export default function EditPlayerModal({ player, onClose, onSaved }) {
     const errs = {};
     if (!form.name.trim()) errs.name = "الاسم مطلوب";
     else if (
-      !/^[\u0600-\u06FF]+([ ][\u0600-\u06FF]+){3}$/.test(form.name.trim())
+      !/^[\u0600-\u06FF]+([ ][\u0600-\u06FF]+){3,}$/.test(form.name.trim())
     )
-      errs.name = "يجب أن يكون الاسم رباعياً بحروف عربية";
+      errs.name = "يجب أن يكون الاسم رباعياً على الأقل بحروف عربية";
+
     if (form.nationalId && !/^\d{14}$/.test(form.nationalId))
       errs.nationalId = "الرقم القومى 14 رقم بالإنجليزية";
     if (form.phone && !/^01[0-9]{9}$/.test(form.phone))
