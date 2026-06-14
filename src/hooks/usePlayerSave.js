@@ -1,6 +1,12 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { collection, addDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getCountFromServer,
+} from "firebase/firestore";
 import { db } from "../utils/firebase";
 
 function getFirebaseErrorMessage(err) {
@@ -21,6 +27,17 @@ function getFirebaseErrorMessage(err) {
   return `❌ خطأ: ${message || code || "غير معروف"}`;
 }
 
+// ✅ Server-side check — الضمان الأخير قبل الحفظ
+async function isNationalIdDuplicate(nationalId) {
+  if (!nationalId || nationalId.length !== 14) return false;
+  const q = query(
+    collection(db, "players"),
+    where("nationalId", "==", nationalId),
+  );
+  const snapshot = await getCountFromServer(q);
+  return snapshot.data().count > 0;
+}
+
 export default function usePlayerSave(selectionData, onUpdateSelection) {
   const [loading, setLoading] = useState(false);
 
@@ -36,21 +53,42 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
 
   const savePlayer = async ({ name, phone, birthdate, nationalId }) => {
     setLoading(true);
-    const player = {
-      nationalId: nationalId || "",
-      name,
-      gender: selectionData?.gender?.name || "",
-      game: selectionData?.game?.name || "",
-      stage: selectionData?.stage?.name || "",
-      church: selectionData?.church?.name || "",
-      phone,
-      birthdate,
-      form: selectionData?.form?.name || "",
-      paid: false,
-      createdAt: new Date().toISOString(),
-    };
 
     try {
+      // ✅ Final server-side duplicate check قبل الحفظ مباشرةً
+      if (nationalId) {
+        const isDuplicate = await isNationalIdDuplicate(nationalId);
+        if (isDuplicate) {
+          toast.error(
+            "❌ هذا الرقم القومى مسجل من قبل — لا يمكن التسجيل مرة أخرى",
+            {
+              duration: 5000,
+              style: {
+                maxWidth: "400px",
+                textAlign: "right",
+                direction: "rtl",
+              },
+            },
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
+      const player = {
+        nationalId: nationalId || "",
+        name,
+        gender: selectionData?.gender?.name || "",
+        game: selectionData?.game?.name || "",
+        stage: selectionData?.stage?.name || "",
+        church: selectionData?.church?.name || "",
+        phone,
+        birthdate,
+        form: selectionData?.form?.name || "",
+        paid: false,
+        createdAt: new Date().toISOString(),
+      };
+
       await addDoc(collection(db, "players"), player);
       toast.success("تم حفظ اللاعب بنجاح 🎉");
       resetSelection();
@@ -68,7 +106,27 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
 
   const saveTeam = async (players, teamName) => {
     setLoading(true);
+
     try {
+      // ✅ Check كل أرقام الفريق قبل ما نبدأ نحفظ أي حاجة
+      for (const p of players) {
+        if (p.nationalId) {
+          const isDuplicate = await isNationalIdDuplicate(p.nationalId);
+          if (isDuplicate) {
+            toast.error(`❌ الرقم القومى للاعب "${p.name}" مسجل من قبل`, {
+              duration: 5000,
+              style: {
+                maxWidth: "400px",
+                textAlign: "right",
+                direction: "rtl",
+              },
+            });
+            setLoading(false);
+            return; // وقف كل العملية — مش بنحفظ أي لاعب
+          }
+        }
+      }
+
       for (const p of players) {
         const playerData = {
           name: p.name,
@@ -86,6 +144,7 @@ export default function usePlayerSave(selectionData, onUpdateSelection) {
         };
         await addDoc(collection(db, "players"), playerData);
       }
+
       toast.success("تم حفظ الفريق بالكامل بنجاح 🎉");
       resetSelection();
     } catch (err) {
