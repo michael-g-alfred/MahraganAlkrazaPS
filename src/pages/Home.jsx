@@ -14,7 +14,7 @@ import SelectCard from "../components/SelectCard";
 // أيقونة Tabler لكل لعبة
 const GAME_ICONS = {
   "تنس طاولة": "ti-ping-pong",
-  "جرى تتابع": "ti-run",
+  جرى: "ti-run",
   شطرنج: "ti-chess",
   "كرة قدم": "ti-ball-football",
   "كرة الطائرة": "ti-ball-volleyball",
@@ -127,7 +127,7 @@ export default function Home() {
   const filteredStages =
     selection.game ?
       stages.filter((stage) =>
-        selection.game.name === "جرى تتابع" ?
+        selection.game.name === "جرى" ?
           stage.name === "المرحلة الأولى (أ)" ||
           stage.name === "المرحلة الأولى (ب)"
         : stage.name !== "المرحلة الأولى (أ)" &&
@@ -143,8 +143,7 @@ export default function Home() {
         selection.game.name === "كرة الطائرة"
       ) ?
         forms.filter((f) => f.name === "جماعى")
-      : selection.game.name === "جرى تتابع" ?
-        forms.filter((f) => f.name === "فردى")
+      : selection.game.name === "جرى" ? forms.filter((f) => f.name === "فردى")
       : forms
     : forms;
 
