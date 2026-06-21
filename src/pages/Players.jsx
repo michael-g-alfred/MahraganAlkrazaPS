@@ -117,23 +117,24 @@ function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
         flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
         border transition-all duration-200 flex-shrink-0
         ${
-          loading ?
-            "opacity-50 cursor-wait border-slate-200 bg-slate-50 text-slate-400"
-          : paid ?
-            "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
-          : "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
+          loading
+            ? "opacity-50 cursor-wait border-slate-200 bg-slate-50 text-slate-400"
+            : paid
+            ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200"
+            : "bg-red-50 border-red-200 text-red-500 hover:bg-red-100"
         }
       `}>
-      {loading ?
+      {loading ? (
         <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-      : paid ?
+      ) : paid ? (
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
-      : <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      ) : (
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
-      }
+      )}
       {paid ? "دفع" : "لم يدفع"}
     </button>
   );
@@ -191,7 +192,6 @@ function PlayerCard({
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* ── زرار التعديل — يظهر فقط لـ canAction ── */}
           {canAction && (
             <button
               type="button"
@@ -295,6 +295,11 @@ function DetailItem({ label, children, className = "" }) {
   );
 }
 
+// ── مساعد: استخراج قيم فريدة غير فارغة ───────────────────────────
+function uniqueValues(arr, key) {
+  return [...new Set(arr.map((p) => p[key]).filter(Boolean))].sort();
+}
+
 export default function Players() {
   const { user } = useAuth();
 
@@ -307,20 +312,19 @@ export default function Players() {
   const [deletingAll, setDeletingAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // ── حالة مودال التعديل ─────────────────────────────────────────
   const [editingPlayer, setEditingPlayer] = useState(null);
 
-  // ── حالة غلق التسجيل ──────────────────────────────────────────
   const [registrationClosed, setRegistrationClosed] = useState(false);
   const [loadingRegStatus, setLoadingRegStatus] = useState(true);
   const [togglingReg, setTogglingReg] = useState(false);
 
+  // ── الفلاتر المتسلسلة ─────────────────────────────────────────
   const [filter, setFilter] = useState({
     gender: "",
     game: "",
-    form: "",
     stage: "",
     church: "",
+    form: "",
     team: "",
     paid: "",
   });
@@ -360,17 +364,27 @@ export default function Players() {
     setLocalPlayers(players);
   }, [players]);
 
-  const isFiltered = Object.values(filter).some(Boolean);
+  // ── دالة تغيير فلتر مع إعادة تعيين الفلاتر التالية ──────────
+  const FILTER_ORDER = ["gender", "game", "stage", "church", "form", "team", "paid"];
 
   const handleFilterChange = (key, value) => {
-    setFilter((prev) => ({ ...prev, [key]: value }));
+    const keyIndex = FILTER_ORDER.indexOf(key);
+    const downstream = FILTER_ORDER.slice(keyIndex + 1);
+
+    setFilter((prev) => {
+      const next = { ...prev, [key]: value };
+      downstream.forEach((k) => { next[k] = ""; });
+      return next;
+    });
     setCurrentPage(1);
   };
 
   const resetFilters = () => {
-    setFilter({ gender: "", game: "", form: "", stage: "", church: "", team: "", paid: "" });
+    setFilter({ gender: "", game: "", stage: "", church: "", form: "", team: "", paid: "" });
     setCurrentPage(1);
   };
+
+  const isFiltered = Object.values(filter).some(Boolean);
 
   const handlePaidToggle = (playerId, newPaid) => {
     setLocalPlayers((prev) =>
@@ -378,28 +392,60 @@ export default function Players() {
     );
   };
 
-  // ── تحديث اللاعب بعد التعديل ──────────────────────────────────
   const handlePlayerSaved = (updatedPlayer) => {
     setLocalPlayers((prev) =>
       prev.map((p) => (p.id === updatedPlayer.id ? { ...p, ...updatedPlayer } : p)),
     );
   };
 
-  const filteredPlayers = useMemo(
-    () =>
-      localPlayers.filter((p) => {
-        if (filter.gender && p.gender !== filter.gender) return false;
-        if (filter.game && p.game !== filter.game) return false;
-        if (filter.stage && p.stage !== filter.stage) return false;
-        if (filter.church && p.church !== filter.church) return false;
-        if (filter.form && p.form !== filter.form) return false;
-        if (filter.team && p.team !== filter.team) return false;
-        if (filter.paid === "دفعوا فقط" && !p.paid) return false;
-        if (filter.paid === "لم يدفعوا فقط" && p.paid) return false;
-        return true;
-      }),
-    [localPlayers, filter],
+  // ── حساب خيارات الفلاتر المتسلسلة ────────────────────────────
+  // كل مستوى يُفلتر على أساس كل ما قبله فقط
+
+  const afterGender = useMemo(
+    () => filter.gender ? localPlayers.filter((p) => p.gender === filter.gender) : localPlayers,
+    [localPlayers, filter.gender],
   );
+
+  const afterGame = useMemo(
+    () => filter.game ? afterGender.filter((p) => p.game === filter.game) : afterGender,
+    [afterGender, filter.game],
+  );
+
+  const afterStage = useMemo(
+    () => filter.stage ? afterGame.filter((p) => p.stage === filter.stage) : afterGame,
+    [afterGame, filter.stage],
+  );
+
+  const afterChurch = useMemo(
+    () => filter.church ? afterStage.filter((p) => p.church === filter.church) : afterStage,
+    [afterStage, filter.church],
+  );
+
+  const afterForm = useMemo(
+    () => filter.form ? afterChurch.filter((p) => p.form === filter.form) : afterChurch,
+    [afterChurch, filter.form],
+  );
+
+  const afterTeam = useMemo(
+    () => filter.team ? afterForm.filter((p) => p.team === filter.team) : afterForm,
+    [afterForm, filter.team],
+  );
+
+  // خيارات كل فلتر (مبنية على ما قبله)
+  const genderOptions  = useMemo(() => uniqueValues(localPlayers, "gender"),  [localPlayers]);
+  const gameOptions    = useMemo(() => uniqueValues(afterGender,   "game"),    [afterGender]);
+  const stageOptions   = useMemo(() => uniqueValues(afterGame,     "stage"),   [afterGame]);
+  const churchOptions  = useMemo(() => uniqueValues(afterStage,    "church"),  [afterStage]);
+  const formOptions    = useMemo(() => uniqueValues(afterChurch,   "form"),    [afterChurch]);
+  const teamOptions    = useMemo(() => uniqueValues(afterForm,     "team"),    [afterForm]);
+
+  // ── النتائج النهائية ─────────────────────────────────────────
+  const filteredPlayers = useMemo(() => {
+    let result = afterTeam;
+    if (filter.paid === "دفعوا فقط")     result = result.filter((p) => p.paid);
+    if (filter.paid === "لم يدفعوا فقط") result = result.filter((p) => !p.paid);
+    return result;
+  }, [afterTeam, filter.paid]);
 
   const totalPages = Math.ceil(filteredPlayers.length / ITEMS_PER_PAGE);
 
@@ -408,13 +454,7 @@ export default function Players() {
     return filteredPlayers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredPlayers, currentPage]);
 
-  const genders = useMemo(() => [...new Set(localPlayers.map((p) => p.gender).filter(Boolean))], [localPlayers]);
-  const games = useMemo(() => [...new Set(localPlayers.map((p) => p.game).filter(Boolean))], [localPlayers]);
-  const stages = useMemo(() => [...new Set(localPlayers.map((p) => p.stage).filter(Boolean))], [localPlayers]);
-  const churches = useMemo(() => [...new Set(localPlayers.map((p) => p.church).filter(Boolean))], [localPlayers]);
-  const forms = useMemo(() => [...new Set(localPlayers.map((p) => p.form).filter(Boolean))], [localPlayers]);
-  const teams = useMemo(() => [...new Set(localPlayers.map((p) => p.team).filter(Boolean))], [localPlayers]);
-
+  // ── حذف ───────────────────────────────────────────────────────
   function handleDeleteItem(player) {
     if (!window.confirm(`هل أنت متأكد من حذف ${player.name}؟`)) return;
     const backup = [...localPlayers];
@@ -517,7 +557,6 @@ export default function Players() {
 
   return (
     <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
-      {/* مودال التعديل */}
       {editingPlayer && (
         <EditPlayerModal
           player={editingPlayer}
@@ -526,27 +565,88 @@ export default function Players() {
         />
       )}
 
-      {/* شريط الفلاتر */}
+      {/* ── شريط الفلاتر المتسلسلة ────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
-        <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">
-          فلترة النتائج
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            فلترة النتائج
+          </p>
+          {isFiltered && (
+            <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5 font-semibold">
+              {Object.values(filter).filter(Boolean).length} فلتر نشط
+            </span>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-2" role="search">
-          <SelectBox label="النوع" value={filter.gender} onChange={(e) => handleFilterChange("gender", e.target.value)} options={genders} />
-          <SelectBox label="المرحلة" value={filter.stage} onChange={(e) => handleFilterChange("stage", e.target.value)} options={stages} />
-          <SelectBox label="اللعبة" value={filter.game} onChange={(e) => handleFilterChange("game", e.target.value)} options={games} />
-          <SelectBox label="الكنيسة" value={filter.church} onChange={(e) => handleFilterChange("church", e.target.value)} options={churches} />
-          <SelectBox label="الإستمارة" value={filter.form} onChange={(e) => handleFilterChange("form", e.target.value)} options={forms} />
-          <SelectBox label="الفريق" value={filter.team} onChange={(e) => handleFilterChange("team", e.target.value)} options={teams} />
-          <SelectBox label="الاشتراك" value={filter.paid} onChange={(e) => handleFilterChange("paid", e.target.value)} options={["دفعوا فقط", "لم يدفعوا فقط"]} />
+
+          {/* النوع — دائماً يظهر */}
+          <SelectBox
+            label="النوع"
+            value={filter.gender}
+            onChange={(e) => handleFilterChange("gender", e.target.value)}
+            options={genderOptions}
+          />
+
+          {/* اللعبة — خياراتها تتغير حسب النوع المختار */}
+          <SelectBox
+            label="اللعبة"
+            value={filter.game}
+            onChange={(e) => handleFilterChange("game", e.target.value)}
+            options={gameOptions}
+          />
+
+          {/* المرحلة — حسب النوع + اللعبة */}
+          <SelectBox
+            label="المرحلة"
+            value={filter.stage}
+            onChange={(e) => handleFilterChange("stage", e.target.value)}
+            options={stageOptions}
+          />
+
+          {/* الكنيسة — حسب النوع + اللعبة + المرحلة */}
+          <SelectBox
+            label="الكنيسة"
+            value={filter.church}
+            onChange={(e) => handleFilterChange("church", e.target.value)}
+            options={churchOptions}
+          />
+
+          {/* الإستمارة — حسب ما قبلها */}
+          <SelectBox
+            label="الإستمارة"
+            value={filter.form}
+            onChange={(e) => handleFilterChange("form", e.target.value)}
+            options={formOptions}
+          />
+
+          {/* الفريق — حسب ما قبله */}
+          {teamOptions.length > 0 && (
+            <SelectBox
+              label="الفريق"
+              value={filter.team}
+              onChange={(e) => handleFilterChange("team", e.target.value)}
+              options={teamOptions}
+            />
+          )}
+
+          {/* الاشتراك — ثابت دائماً */}
+          <SelectBox
+            label="الاشتراك"
+            value={filter.paid}
+            onChange={(e) => handleFilterChange("paid", e.target.value)}
+            options={["دفعوا فقط", "لم يدفعوا فقط"]}
+          />
+
+          {/* زر مسح الفلاتر */}
           <button
             onClick={resetFilters}
             disabled={!isFiltered}
             title="مسح جميع الفلاتر"
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-              isFiltered ?
-                "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
-              : "bg-slate-100 text-slate-300 cursor-not-allowed"
+              isFiltered
+                ? "bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+                : "bg-slate-100 text-slate-300 border border-transparent cursor-not-allowed"
             }`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -554,9 +654,34 @@ export default function Players() {
             مسح
           </button>
         </div>
+
+        {/* ملخص الفلاتر النشطة */}
+        {isFiltered && (
+          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-100">
+            {FILTER_ORDER.filter((k) => filter[k]).map((k) => {
+              const labels = {
+                gender: "النوع", game: "اللعبة", stage: "المرحلة",
+                church: "الكنيسة", form: "الإستمارة", team: "الفريق", paid: "الاشتراك",
+              };
+              return (
+                <button
+                  key={k}
+                  onClick={() => handleFilterChange(k, "")}
+                  className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-600 hover:text-white transition-all"
+                  title={`إزالة فلتر ${labels[k]}`}>
+                  <span className="font-medium">{labels[k]}:</span>
+                  <span>{filter[k]}</span>
+                  <svg className="w-3 h-3 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* شريط الإحصاء والأزرار */}
+      {/* ── شريط الإحصاء والأزرار ──────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4 px-1">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-blue-700 inline-block"></span>
@@ -579,9 +704,9 @@ export default function Players() {
               onClick={handleExportExcel}
               disabled={filteredPlayers.length === 0}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                filteredPlayers.length === 0 ?
-                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
+                filteredPlayers.length === 0
+                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-700 hover:text-white cursor-pointer"
               }`}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -592,9 +717,9 @@ export default function Players() {
               onClick={handleDeleteAll}
               disabled={deletingAll || localPlayers.length === 0}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                deletingAll || localPlayers.length === 0 ?
-                  "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
+                deletingAll || localPlayers.length === 0
+                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                  : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
               }`}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -605,8 +730,8 @@ export default function Players() {
         )}
       </div>
 
-      {/* قائمة اللاعبين */}
-      {filteredPlayers.length === 0 ?
+      {/* ── قائمة اللاعبين ─────────────────────────────────────── */}
+      {filteredPlayers.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
           <svg className="w-10 h-10 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -614,7 +739,8 @@ export default function Players() {
           <p className="font-semibold text-slate-500">لا توجد نتائج</p>
           <p className="text-sm">حاول تغيير الفلتر أو مسحه</p>
         </div>
-      : <>
+      ) : (
+        <>
           <div className="flex flex-col gap-2 pb-4">
             {paginatedPlayers.map((player, index) => (
               <PlayerCard
@@ -635,7 +761,7 @@ export default function Players() {
             onPageChange={setCurrentPage}
           />
         </>
-      }
+      )}
     </div>
   );
 }
@@ -647,21 +773,23 @@ function RegistrationToggleButton({ closed, loading, onToggle }) {
       disabled={loading}
       title={closed ? "فتح التسجيل" : "غلق التسجيل"}
       className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-200 ${
-        loading ? "bg-slate-50 text-slate-300 border-slate-200 cursor-wait"
-        : closed ?
-          "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-700 hover:text-white cursor-pointer"
-        : "bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-700 hover:text-white cursor-pointer"
+        loading
+          ? "bg-slate-50 text-slate-300 border-slate-200 cursor-wait"
+          : closed
+          ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-700 hover:text-white cursor-pointer"
+          : "bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-700 hover:text-white cursor-pointer"
       }`}>
-      {loading ?
+      {loading ? (
         <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-      : closed ?
+      ) : closed ? (
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
         </svg>
-      : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      ) : (
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7a4 4 0 00-8 0v4h8V7z" />
         </svg>
-      }
+      )}
       {loading ? "..." : closed ? "فتح التسجيل" : "غلق التسجيل"}
     </button>
   );
