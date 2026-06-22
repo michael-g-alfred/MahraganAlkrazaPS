@@ -343,6 +343,21 @@ function uniqueValues(arr, key) {
   return [...new Set(arr.map((p) => p[key]).filter(Boolean))].sort();
 }
 
+// ── مساعد: تطبيع النص العربي للبحث (يشيل التشكيل ويوحّد الحروف المتشابهة) ──
+function normalizeArabicSearch(str) {
+  if (!str) return "";
+  return str
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .toLowerCase();
+}
+
 export default function Players() {
   const { user } = useAuth();
 
@@ -360,6 +375,9 @@ export default function Players() {
   const [registrationClosed, setRegistrationClosed] = useState(false);
   const [loadingRegStatus, setLoadingRegStatus] = useState(true);
   const [togglingReg, setTogglingReg] = useState(false);
+
+  // ── البحث بالاسم ─────────────────────────────────────────────
+  const [searchName, setSearchName] = useState("");
 
   // ── الفلاتر المتسلسلة ─────────────────────────────────────────
   const [filter, setFilter] = useState({
@@ -447,7 +465,12 @@ export default function Players() {
     setCurrentPage(1);
   };
 
-  const isFiltered = Object.values(filter).some(Boolean);
+  const handleSearchChange = (value) => {
+    setSearchName(value);
+    setCurrentPage(1);
+  };
+
+  const isFiltered = Object.values(filter).some(Boolean) || !!searchName.trim();
 
   const handlePaidToggle = (playerId, newPaid) => {
     setLocalPlayers((prev) =>
@@ -543,8 +566,17 @@ export default function Players() {
     let result = afterTeam;
     if (filter.paid === "دفعوا فقط") result = result.filter((p) => p.paid);
     if (filter.paid === "لم يدفعوا فقط") result = result.filter((p) => !p.paid);
+
+    const trimmedSearch = searchName.trim();
+    if (trimmedSearch) {
+      const normalizedSearch = normalizeArabicSearch(trimmedSearch);
+      result = result.filter((p) =>
+        normalizeArabicSearch(p.name).includes(normalizedSearch),
+      );
+    }
+
     return result;
-  }, [afterTeam, filter.paid]);
+  }, [afterTeam, filter.paid, searchName]);
 
   const totalPages = Math.ceil(filteredPlayers.length / ITEMS_PER_PAGE);
 
@@ -704,6 +736,59 @@ export default function Players() {
         />
       )}
 
+      {/* ── شريط البحث بالاسم ──────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
+        <label
+          htmlFor="playerSearch"
+          className="block mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          البحث بالاسم
+        </label>
+        <div className="relative">
+          <svg
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <input
+            id="playerSearch"
+            type="text"
+            value={searchName}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="اكتب اسم اللاعب..."
+            className="w-full border border-blue-700 rounded-xl pr-10 pl-10 py-2.5 text-sm
+                       outline-none focus:ring-2 focus:ring-blue-300 transition"
+          />
+          {searchName && (
+            <button
+              type="button"
+              onClick={() => handleSearchChange("")}
+              aria-label="مسح البحث"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ── شريط الفلاتر المتسلسلة ────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
@@ -712,7 +797,9 @@ export default function Players() {
           </p>
           {isFiltered && (
             <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5 font-semibold">
-              {Object.values(filter).filter(Boolean).length} فلتر نشط
+              {Object.values(filter).filter(Boolean).length +
+                (searchName.trim() ? 1 : 0)}{" "}
+              فلتر نشط
             </span>
           )}
         </div>
@@ -778,7 +865,10 @@ export default function Players() {
 
           {/* زر مسح الفلاتر */}
           <button
-            onClick={resetFilters}
+            onClick={() => {
+              resetFilters();
+              handleSearchChange("");
+            }}
             disabled={!isFiltered}
             title="مسح جميع الفلاتر"
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
@@ -805,6 +895,27 @@ export default function Players() {
         {/* ملخص الفلاتر النشطة */}
         {isFiltered && (
           <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-100">
+            {searchName.trim() && (
+              <button
+                onClick={() => handleSearchChange("")}
+                className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-600 hover:text-white transition-all"
+                title="إزالة البحث بالاسم">
+                <span className="font-medium">الاسم:</span>
+                <span>{searchName.trim()}</span>
+                <svg
+                  className="w-3 h-3 mr-0.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
             {FILTER_ORDER.filter((k) => filter[k]).map((k) => {
               const labels = {
                 gender: "النوع",
