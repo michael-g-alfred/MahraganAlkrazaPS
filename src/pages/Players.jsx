@@ -595,8 +595,7 @@ export default function Players() {
   }
 
   function handleExportExcel() {
-    const rows = filteredPlayers.map((p, i) => ({
-      "#": i + 1,
+    const rows = filteredPlayers.map((p) => ({
       الاسم: p.name,
       "الرقم القومى": p.nationalId || "",
       النوع: p.gender,
@@ -609,9 +608,10 @@ export default function Players() {
       "اسم الفريق": p.team || "",
       "دفع الاشتراك": p.paid ? "دفع ✓" : "لم يدفع ✗",
     }));
+
     const ws = XLSX.utils.json_to_sheet(rows);
+
     ws["!cols"] = [
-      { wch: 5 },
       { wch: 25 },
       { wch: 18 },
       { wch: 10 },
@@ -624,10 +624,22 @@ export default function Players() {
       { wch: 20 },
       { wch: 15 },
     ];
+
     const wb = XLSX.utils.book_new();
+
+    // جعل المصنف RTL
+    wb.Workbook = {
+      Views: [{ RTL: true }],
+    };
+
     XLSX.utils.book_append_sheet(wb, ws, "اللاعبين");
-    const fileName = `اللاعبين_${new Date().toLocaleDateString("ar-EG").replace(/\//g, "-")}.xlsx`;
+
+    const fileName = `اللاعبين_${new Date()
+      .toLocaleDateString("ar-EG")
+      .replace(/\//g, "-")}.xlsx`;
+
     XLSX.writeFile(wb, fileName);
+
     toast.success("تم تحميل Excel ✅");
   }
 
