@@ -282,7 +282,7 @@ export default function Admin() {
   // ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen max-w-4xl mx-auto" dir="rtl">
+    <div className="min-h-screen max-w-7xl mx-auto" dir="rtl">
       {/* ═══ رأس الصفحة ══════════════════════════════════════════ */}
       <div className="flex justify-between items-center bg-blue-700 text-white px-5 py-3.5 rounded-2xl shadow-md mb-5">
         <div className="flex items-center gap-3">
@@ -498,7 +498,7 @@ export default function Admin() {
             </div>
 
             {/* ── مباريات الدور الحالي ── */}
-            <div className="flex flex-col gap-3 pb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-8">
               {currentRound?.matches.map((match, matchIdx) => {
                 // ── كارت البطل النهائي ──
                 if (match.isChampion) {
