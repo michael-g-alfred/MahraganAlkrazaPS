@@ -276,10 +276,6 @@ export default function Admin() {
   const currentRound = localBracket?.rounds?.[activeRoundIdx];
   const isFirstRoundRelay =
     activeRoundIdx === 0 && localBracket?.rounds?.[0]?.matches?.[0]?.players;
-  const totalRounds = localBracket?.rounds?.length ?? 0;
-  const completedRounds =
-    localBracket?.rounds?.filter((r) => r.matches.every((m) => m.winner))
-      .length ?? 0;
 
   // ─────────────────────────────────────────────────────────────────
   // العرض
@@ -467,32 +463,6 @@ export default function Admin() {
         {/* ═══ لوحة القرعة الرئيسية ═══════════════════════════════ */}
         {!bracketLoading && localBracket && (
           <>
-            {/* ── شريط التقدم ── */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-slate-600">
-                  تقدم المسابقة
-                </p>
-                <span className="text-xs font-bold text-blue-700">
-                  {completedRounds} / {totalRounds} دور
-                </span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-700 rounded-full transition-all duration-500"
-                  style={{
-                    width:
-                      totalRounds ?
-                        `${(completedRounds / totalRounds) * 100}%`
-                      : "0%",
-                  }}
-                  role="progressbar"
-                  aria-valuenow={completedRounds}
-                  aria-valuemax={totalRounds}
-                />
-              </div>
-            </div>
-
             {/* ── تبويبات الأدوار ── */}
             <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-1 px-1 scrollbar-none">
               {localBracket.rounds.map((round, idx) => {
@@ -525,11 +495,6 @@ export default function Admin() {
                   </button>
                 );
               })}
-            </div>
-
-            {/* ── عنوان الدور الحالي ── */}
-            <div className="bg-blue-700 text-white text-center text-sm font-bold py-2.5 px-4 rounded-xl mb-3">
-              {currentRound?.roundName}
             </div>
 
             {/* ── مباريات الدور الحالي ── */}
