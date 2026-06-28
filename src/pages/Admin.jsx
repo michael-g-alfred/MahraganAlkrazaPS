@@ -123,8 +123,8 @@ export default function Admin() {
   // ── دوال إنشاء القرعة ─────────────────────────────────────────
 
   const handleGenerateBracket = async () => {
-    if (filteredPlayers.length < 2) {
-      toast.error("محتاج على الأقل لاعبين اثنين!");
+    if (filteredPlayers.length < 1) {
+      toast.error("محتاج على الأقل لاعب واحد!");
       return;
     }
     setSaving(true);
@@ -391,9 +391,9 @@ export default function Admin() {
                     {filteredPlayers.length}
                   </span>
                 </p>
-                {filteredPlayers.length < 2 && (
+                {filteredPlayers.length < 1 && (
                   <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                    يجب 2 لاعبين على الأقل
+                    لا يوجد لاعبون في هذه المجموعة
                   </span>
                 )}
               </div>
@@ -407,10 +407,10 @@ export default function Admin() {
             {!localBracket && (
               <button
                 onClick={handleGenerateBracket}
-                disabled={saving || filteredPlayers.length < 2}
+                disabled={filteredPlayers.length < 1 || saving}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
                            font-semibold text-sm transition-all duration-200 ${
-                             saving || filteredPlayers.length < 2 ?
+                             saving || filteredPlayers.length < 1 ?
                                "bg-slate-100 text-slate-400 cursor-not-allowed"
                              : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
                            }`}>
@@ -681,26 +681,6 @@ export default function Admin() {
                                      text-sm font-semibold hover:bg-blue-800 transition disabled:opacity-50">
                           تأكيد الفائز ✓
                         </button>
-                      )}
-
-                      {hasWinner && !isBye && (
-                        <div className="py-2 px-4 bg-emerald-100 border border-emerald-200 rounded-xl flex items-center gap-2">
-                          <svg
-                            className="w-4 h-4 text-emerald-600 flex-shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}>
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <p className="text-sm font-semibold text-emerald-800 truncate">
-                            {match.winner}
-                          </p>
-                        </div>
                       )}
 
                       {isBye && (

@@ -47,7 +47,29 @@ function shuffleArray(arr) {
 
 // توليد الهيكل المبدئي للقرعة
 export default function generateBracket(items, isTeam = false) {
-  if (items.length < 2) return null;
+  if (items.length === 0) return null;
+
+  if (items.length === 1) {
+    const p = items[0];
+    const name = p.church ? `${p.name}-${p.church}` : p.name || "؟";
+    return {
+      rounds: [
+        {
+          roundName: "بطل المسابقة",
+          matches: [
+            {
+              id: "champion_box",
+              p1: name,
+              winner: name,
+              isChampion: true,
+              isBye: true,
+            },
+          ],
+        },
+      ],
+      generatedAt: new Date().toISOString(),
+    };
+  }
 
   const isRelay = items[0]?.game && items[0].game.includes("تتابع");
   const firstRoundMatches = [];
@@ -76,7 +98,10 @@ export default function generateBracket(items, isTeam = false) {
     const unique =
       isTeam ? [...new Map(items.map((p) => [p.team, p])).values()] : items;
     const shuffled = shuffleArray(unique);
-    const getName = (x) => (isTeam ? x.team : x.name) || "؟";
+    const getName = (x) => {
+      if (isTeam) return x.team || "؟";
+      return x.church ? `${x.name}-${x.church}` : x.name || "؟";
+    };
     const players = shuffled.map((p) => getName(p));
 
     for (let i = 0; i < players.length; i += 2) {
