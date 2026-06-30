@@ -1,14 +1,14 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import useFetch from "../hooks/useFetch";
-import useBracket from "../hooks/useBracket";
+import useAdminBracket from "../hooks/useAdminBracket";
 import SelectBox from "../components/SelectBox";
 import Loader from "../components/Loader";
-import generateBracket, { propagateWinners } from "../utils/generateBracket";
-import toast from "react-hot-toast";
-import { doc, deleteDoc } from "firebase/firestore";
-import { db } from "../utils/firebase";
+import RoundTabs from "../components/admin/RoundTabs";
+import ChampionCard from "../components/admin/ChampionCard";
+import RelayChurchCard from "../components/admin/RelayChurchCard";
+import NormalMatchCard from "../components/admin/NormalMatchCard";
 
 // ─── المكون الرئيسي ────────────────────────────────────────────────
 
@@ -23,9 +23,6 @@ export default function Admin() {
   const [selectedGender, setSelectedGender] = useState("");
   const [selectedForm, setSelectedForm] = useState("");
 
-  const [saving, setSaving] = useState(false);
-  const [activeRoundIdx, setActiveRoundIdx] = useState(0);
-
   const playersList = useMemo(() => rawPlayers || [], [rawPlayers]);
 
   // ── بناء مفتاح القرعة ────────────────────────────────────────
@@ -33,30 +30,6 @@ export default function Admin() {
     selectedGame && selectedStage && selectedGender && selectedForm ?
       `${selectedGame}__${selectedGender}__${selectedForm}__${selectedStage}`
     : null;
-
-  const safeBracketKey =
-    bracketKey ?
-      bracketKey.replace(/\s+/g, "_").replace(/[./[\]#$]/g, "_")
-    : null;
-
-  const {
-    bracket,
-    loading: bracketLoading,
-    saveBracket,
-  } = useBracket(bracketKey);
-
-  const [localBracket, setLocalBracket] = useState(null);
-
-  // ── إعادة تهيئة عند تغيير المجموعة ──────────────────────────
-
-  useEffect(() => {
-    setLocalBracket(null);
-    setActiveRoundIdx(0);
-  }, [bracketKey]);
-
-  useEffect(() => {
-    if (bracket) setLocalBracket(JSON.parse(JSON.stringify(bracket)));
-  }, [bracket]);
 
   // ── خيارات القوائم المنسدلة ──────────────────────────────────
 
@@ -120,162 +93,23 @@ export default function Admin() {
 
   const isTeam = selectedForm === "جماعى";
 
-  // ── دوال إنشاء القرعة ─────────────────────────────────────────
+  // ── كل منطق وحالة القرعة ─────────────────────────────────────
 
-  const handleGenerateBracket = async () => {
-    if (filteredPlayers.length < 1) {
-      toast.error("محتاج على الأقل لاعب واحد!");
-      return;
-    }
-    setSaving(true);
-    try {
-      const newBracket = generateBracket(filteredPlayers, isTeam);
-      await saveBracket(newBracket);
-      setLocalBracket(newBracket);
-      setActiveRoundIdx(0);
-      toast.success("تم إنشاء الهيكل المبدئي بنجاح");
-    } catch {
-      toast.error("فشل الحفظ");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleResetBracket = async () => {
-    if (
-      !window.confirm("سيتم مسح البيانات الحالية وإعادة التهيئة، هل أنت متأكد؟")
-    )
-      return;
-    setSaving(true);
-    try {
-      // حذف القرعة من Firestore
-      await deleteDoc(doc(db, "brackets", safeBracketKey));
-      // إنشاء هيكل جديد
-      const newBracket = generateBracket(filteredPlayers, isTeam);
-      await saveBracket(newBracket);
-      setLocalBracket(newBracket);
-      setActiveRoundIdx(0);
-      toast.success("تمت إعادة الهيكلة");
-    } catch {
-      toast.error("فشل المسح");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ── دوال إدخال النتائج ────────────────────────────────────────
-
-  const handleRelayPlayerScoreChange = (matchIdx, playerIdx, value) => {
-    setLocalBracket((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-      updated.rounds[activeRoundIdx].matches[matchIdx].players[
-        playerIdx
-      ].score = value;
-      return updated;
-    });
-  };
-
-  const handleNormalScoreChange = (matchIdx, field, value) => {
-    setLocalBracket((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-      updated.rounds[activeRoundIdx].matches[matchIdx][field] =
-        value === "" ? null : value;
-      return updated;
-    });
-  };
-
-  const handleSetChurchWinner = async (matchIdx) => {
-    const group = localBracket.rounds[activeRoundIdx].matches[matchIdx];
-
-    const hasInvalidTime = group.players.some(
-      (p) =>
-        p.score === undefined ||
-        p.score === null ||
-        p.score === "" ||
-        Number(p.score) <= 0,
-    );
-    if (hasInvalidTime) {
-      toast.error("برجاء إدخال توقيتات صحيحة أكبر من الصفر");
-      return;
-    }
-
-    let bestPlayer = group.players[0];
-    let minTime = parseFloat(bestPlayer.score);
-    for (let i = 1; i < group.players.length; i++) {
-      const t = parseFloat(group.players[i].score);
-      if (t < minTime) {
-        minTime = t;
-        bestPlayer = group.players[i];
-      }
-    }
-
-    setSaving(true);
-    try {
-      const updated = JSON.parse(JSON.stringify(localBracket));
-      updated.rounds[activeRoundIdx].matches[matchIdx].winner =
-        `${bestPlayer.name} (${group.churchName})`;
-      propagateWinners(updated.rounds);
-      await saveBracket(updated);
-      setLocalBracket(updated);
-      toast.success(`صعد الأسرع: ${bestPlayer.name}`);
-    } catch {
-      toast.error("فشل حفظ التصفية");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSetNormalMatchWinner = async (matchIdx) => {
-    const match = localBracket.rounds[activeRoundIdx].matches[matchIdx];
-
-    if (
-      match.score1 === null ||
-      match.score2 === null ||
-      match.score1 === "" ||
-      match.score2 === ""
-    ) {
-      toast.error("أدخل النتيجة أولاً");
-      return;
-    }
-
-    let winner = "";
-    if (match.isRelay) {
-      const t1 = parseFloat(match.score1);
-      const t2 = parseFloat(match.score2);
-      if (t1 === t2) {
-        toast.error("لا يمكن تعادل الأوقات في التتابع");
-        return;
-      }
-      winner = t1 < t2 ? match.p1 : match.p2;
-    } else {
-      if (Number(match.score1) === Number(match.score2)) {
-        toast.error("يجب وجود فائز في أدوار خروج المغلوب");
-        return;
-      }
-      winner =
-        Number(match.score1) > Number(match.score2) ? match.p1 : match.p2;
-    }
-
-    setSaving(true);
-    try {
-      const updated = JSON.parse(JSON.stringify(localBracket));
-      updated.rounds[activeRoundIdx].matches[matchIdx].winner = winner;
-      propagateWinners(updated.rounds);
-      await saveBracket(updated);
-      setLocalBracket(updated);
-      toast.success(`الفائز المصعد: ${winner}`);
-    } catch {
-      toast.error("فشل الحفظ");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ── متغيرات مشتقة ────────────────────────────────────────────
-
-  const currentRound = localBracket?.rounds?.[activeRoundIdx];
-  const isFirstRoundRelay =
-    activeRoundIdx === 0 && localBracket?.rounds?.[0]?.matches?.[0]?.players;
+  const {
+    localBracket,
+    bracketLoading,
+    saving,
+    activeRoundIdx,
+    setActiveRoundIdx,
+    currentRound,
+    isRelayGroupRound,
+    handleGenerateBracket,
+    handleResetBracket,
+    handleRelayPlayerScoreChange,
+    handleNormalScoreChange,
+    handleSetChurchWinner,
+    handleSetNormalMatchWinner,
+  } = useAdminBracket(bracketKey, filteredPlayers, isTeam);
 
   // ─────────────────────────────────────────────────────────────────
   // العرض
@@ -463,204 +297,41 @@ export default function Admin() {
         {/* ═══ لوحة القرعة الرئيسية ═══════════════════════════════ */}
         {!bracketLoading && localBracket && (
           <>
-            {/* ── تبويبات الأدوار ── */}
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-1 px-1 scrollbar-none">
-              {localBracket.rounds.map((round, idx) => {
-                const isDone = round.matches.every((m) => m.winner);
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveRoundIdx(idx)}
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full
-                               text-xs font-semibold transition-all duration-200 border ${
-                                 activeRoundIdx === idx ?
-                                   "bg-blue-700 text-white border-blue-700 shadow-sm"
-                                 : isDone ?
-                                   "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                 : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
-                               }`}>
-                    {isDone && activeRoundIdx !== idx && (
-                      <svg
-                        className="w-3 h-3"
-                        fill="currentColor"
-                        viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                    {round.roundName}
-                  </button>
-                );
-              })}
-            </div>
+            <RoundTabs
+              rounds={localBracket.rounds}
+              activeRoundIdx={activeRoundIdx}
+              onSelect={setActiveRoundIdx}
+            />
 
             {/* ── مباريات الدور الحالي ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-8">
               {currentRound?.matches.map((match, matchIdx) => {
-                // ── كارت البطل النهائي ──
                 if (match.isChampion) {
-                  return (
-                    <div
-                      key={match.id}
-                      className="border-2 border-amber-300 rounded-2xl p-6 bg-amber-50 text-center shadow-sm">
-                      <div className="w-16 h-16 bg-amber-100 border-2 border-amber-300 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <svg
-                          className="w-8 h-8 text-amber-600"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}>
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 21h8M12 17v4M12 17c-3.314 0-6-2.686-6-6V4h12v7c0 3.314-2.686 6-6 6zM4 7H2M20 7h2"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-xs font-semibold text-amber-600 mb-1 uppercase tracking-wide">
-                        بطل المسابقة
-                      </p>
-                      <p className="text-lg font-bold text-amber-900 break-words">
-                        {match.p1}
-                      </p>
-                    </div>
-                  );
+                  return <ChampionCard key={match.id} match={match} />;
                 }
 
-                // ── كارت تصفيات كنيسة ──
-                if (isFirstRoundRelay) {
-                  const hasChurchWinner = !!match.winner;
+                if (isRelayGroupRound) {
                   return (
-                    <div
+                    <RelayChurchCard
                       key={match.id}
-                      className={`bg-white rounded-2xl p-4 border shadow-sm transition-all ${
-                        hasChurchWinner ?
-                          "border-emerald-300 bg-emerald-50/30"
-                        : "border-slate-200"
-                      }`}>
-                      <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
-                        <div className="w-2 h-2 rounded-full bg-blue-700"></div>
-                        <p className="text-sm font-bold text-slate-700">
-                          {match.churchName}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col divide-y divide-slate-100">
-                        {match.players.map((player, pIdx) => (
-                          <TimeRow
-                            key={pIdx}
-                            name={player.name}
-                            score={player.score}
-                            disabled={hasChurchWinner}
-                            onChange={(val) =>
-                              handleRelayPlayerScoreChange(matchIdx, pIdx, val)
-                            }
-                          />
-                        ))}
-                      </div>
-
-                      {!hasChurchWinner ?
-                        <button
-                          onClick={() => handleSetChurchWinner(matchIdx)}
-                          disabled={saving}
-                          className="mt-3 w-full py-2.5 bg-blue-700 text-white rounded-xl
-                                     text-sm font-semibold hover:bg-blue-800 transition disabled:opacity-50">
-                          تصعيد أسرع لاعب ↑
-                        </button>
-                      : <div className="mt-3 py-2.5 px-4 bg-emerald-100 border border-emerald-200 rounded-xl flex items-center gap-2">
-                          <svg
-                            className="w-4 h-4 text-emerald-600 flex-shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}>
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <p className="text-sm font-semibold text-emerald-800">
-                            المتأهل: {match.winner.split(" (")[0]}
-                          </p>
-                        </div>
-                      }
-                    </div>
+                      match={match}
+                      matchIdx={matchIdx}
+                      saving={saving}
+                      onScoreChange={handleRelayPlayerScoreChange}
+                      onConfirm={handleSetChurchWinner}
+                    />
                   );
                 }
-
-                // ── كارت مباراة عادية ──
-                const hasWinner = !!match.winner;
-                const isBye = match.isBye;
-                const waiting = !match.p1 || !match.p2;
 
                 return (
-                  <div
+                  <NormalMatchCard
                     key={match.id}
-                    className={`bg-white rounded-2xl border shadow-sm transition-all ${
-                      isBye ? "border-slate-100 opacity-70"
-                      : hasWinner ? "border-emerald-300"
-                      : "border-slate-200"
-                    }`}>
-                    <div className="p-4">
-                      <NormalPlayerRow
-                        name={match.p1}
-                        score={match.score1}
-                        isWinner={match.winner === match.p1 && !isBye}
-                        disabled={isBye || hasWinner || waiting}
-                        isRelay={match.isRelay}
-                        onChange={(val) =>
-                          handleNormalScoreChange(matchIdx, "score1", val)
-                        }
-                      />
-
-                      <div className="flex items-center gap-3 py-2">
-                        <div className="flex-1 h-px bg-slate-100"></div>
-                        <span className="text-xs font-bold text-slate-300 tracking-widest">
-                          VS
-                        </span>
-                        <div className="flex-1 h-px bg-slate-100"></div>
-                      </div>
-
-                      <NormalPlayerRow
-                        name={match.p2}
-                        score={match.score2}
-                        isWinner={match.winner === match.p2 && !isBye}
-                        disabled={isBye || hasWinner || waiting}
-                        isRelay={match.isRelay}
-                        onChange={(val) =>
-                          handleNormalScoreChange(matchIdx, "score2", val)
-                        }
-                      />
-                    </div>
-
-                    <div className="px-4 pb-4">
-                      {!hasWinner && !isBye && !waiting && (
-                        <button
-                          onClick={() => handleSetNormalMatchWinner(matchIdx)}
-                          disabled={saving}
-                          className="w-full py-2.5 bg-blue-700 text-white rounded-xl
-                                     text-sm font-semibold hover:bg-blue-800 transition disabled:opacity-50">
-                          تأكيد الفائز ✓
-                        </button>
-                      )}
-
-                      {isBye && (
-                        <div className="py-2 px-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-semibold text-center">
-                          تأهل تلقائي
-                        </div>
-                      )}
-
-                      {!hasWinner && !isBye && waiting && (
-                        <div className="py-2 text-center text-xs text-slate-400 italic">
-                          في انتظار نتائج الدور السابق...
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    match={match}
+                    matchIdx={matchIdx}
+                    saving={saving}
+                    onScoreChange={handleNormalScoreChange}
+                    onConfirm={handleSetNormalMatchWinner}
+                  />
                 );
               })}
             </div>
@@ -696,122 +367,6 @@ export default function Admin() {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// ─── مكونات مساعدة ────────────────────────────────────────────────
-
-function TimeRow({ name, score, onChange, disabled }) {
-  const displayValue = score === "00:00:00" || !score ? "" : score;
-
-  return (
-    <div className="flex items-center gap-3 py-2.5">
-      <span className="flex-1 text-sm text-slate-700 break-words min-w-0 leading-tight">
-        {name}
-      </span>
-      <div
-        className="flex items-center gap-1 flex-shrink-0"
-        style={{ direction: "ltr" }}>
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          value={displayValue}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-20 text-center border border-slate-200 rounded-lg py-1.5 px-2 text-sm
-                     font-mono bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500
-                     outline-none transition disabled:bg-slate-50 disabled:text-slate-400
-                     [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none
-                     [&::-webkit-inner-spin-button]:appearance-none"
-        />
-        <span className="text-xs text-slate-400 font-medium">ث</span>
-      </div>
-    </div>
-  );
-}
-
-function NormalPlayerRow({
-  name,
-  score,
-  isWinner,
-  onChange,
-  disabled,
-  isRelay,
-}) {
-  const displayValue =
-    isRelay && (score === "00:00:00" || !score) ? "" : (score ?? "");
-
-  const displayName =
-    name ?
-      name.includes(" (") ?
-        name.split(" (")[0]
-      : name
-    : "—";
-
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
-        isWinner ?
-          "bg-emerald-100 border border-emerald-200"
-        : "bg-slate-50 border border-transparent"
-      }`}>
-      {isWinner && (
-        <svg
-          className="w-4 h-4 text-emerald-600 flex-shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-      )}
-
-      <span
-        className={`flex-1 text-sm break-words min-w-0 leading-tight ${
-          name && name !== "BYE" ? "text-slate-800" : "text-slate-300 italic"
-        } ${isWinner ? "font-semibold text-emerald-900" : ""}`}>
-        {displayName}
-      </span>
-
-      {isRelay ?
-        <div
-          className="flex items-center gap-1 flex-shrink-0"
-          style={{ direction: "ltr" }}>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            value={displayValue}
-            disabled={disabled}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-20 text-center border border-slate-200 rounded-lg py-1.5 px-2 text-sm
-                     font-mono bg-white focus:border-blue-500 outline-none
-                     disabled:bg-slate-50 disabled:text-slate-400
-                     [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none
-                     [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          <span className="text-xs text-slate-400">ث</span>
-        </div>
-      : <input
-          type="number"
-          min="0"
-          value={displayValue}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className="w-16 text-center border border-slate-200 rounded-lg py-1.5 px-2
-                   text-sm font-mono bg-white focus:border-blue-500 outline-none
-                   disabled:bg-slate-50 disabled:text-slate-400 flex-shrink-0"
-          placeholder="0"
-        />
-      }
     </div>
   );
 }

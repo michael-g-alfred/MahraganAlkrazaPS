@@ -71,7 +71,7 @@ export default function generateBracket(items, isTeam = false) {
     };
   }
 
-  const isRelay = items[0]?.game && items[0].game.includes("تتابع");
+  const isRelay = items[0]?.game && items[0].game.includes("جرى");
   const firstRoundMatches = [];
 
   if (isRelay) {
@@ -92,6 +92,7 @@ export default function generateBracket(items, isTeam = false) {
         })),
         winner: null,
         isRelay: true,
+        isChurchHeat: true, // سباق داخل كنيسة واحدة (دور الكنائس)
       });
     });
   } else {
@@ -185,6 +186,39 @@ export function propagateWinners(rounds) {
       const nextRoundIdx = currentRoundIdx + 1;
       const nextRoundExists = !!rounds[nextRoundIdx];
       const isRelay = currentRound.matches[0]?.isRelay;
+      const isChurchHeatRound = currentRound.matches[0]?.isChurchHeat;
+
+      // ── حالة الجري: دور الكنائس انتهى → تحديد البطل مباشرة بمقارنة الأوقات ──
+      // (بدون دور تالٍ / بدون تصعيد أسرع لاعب لسباق إضافي، ولو فيه تعادل بين
+      // أكتر من كنيسة على نفس التوقيت، الكل يبقى بطل)
+      if (isRelay && isChurchHeatRound) {
+        // نشيل أي دور قديم كان موجود بعد دور الكنائس (مثلاً "دور الأوائل" من نسخة سابقة)
+        rounds.splice(currentRoundIdx + 1);
+
+        const bestTime = Math.min(
+          ...currentRound.matches.map((m) => parseFloat(m.winnerTime)),
+        );
+        const championMatches = currentRound.matches.filter(
+          (m) => parseFloat(m.winnerTime) === bestTime,
+        );
+        const championNames = championMatches
+          .map((m) => m.winner)
+          .join("\n");
+
+        rounds.push({
+          roundName: "بطل المسابقة",
+          matches: [
+            {
+              id: "champion_box",
+              p1: championNames,
+              winner: championNames,
+              isChampion: true,
+              isBye: true,
+            },
+          ],
+        });
+        break;
+      }
 
       let winners = [];
       if (nextRoundExists) {
