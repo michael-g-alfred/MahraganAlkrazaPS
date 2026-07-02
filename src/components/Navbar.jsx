@@ -1,9 +1,11 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getPrivileges } from "../utils/permissions";
 
 export default function Navbar() {
   const { user } = useAuth();
+  const privileges = getPrivileges(user?.email);
 
   return (
     <nav
@@ -33,14 +35,25 @@ export default function Navbar() {
             اللاعبين
           </NavLink>
           <NavLink
-            to="/admin"
+            to="/brackets"
             className={({ isActive }) =>
               isActive ?
-                "bg-blue-700 text-white px-3 py-1 rounded-full text-sm font-bold"
-              : "border border-blue-700 text-blue-700 px-3 py-1 rounded-full text-sm font-bold hover:bg-blue-50 transition"
+                "text-blue-700 font-semibold"
+              : "text-gray-500 hover:text-blue-500 transition-colors duration-200"
             }>
-            الأدمن
+            القرعات
           </NavLink>
+          {privileges.fullAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                isActive ?
+                  "bg-blue-700 text-white px-3 py-1 rounded-full text-sm font-bold"
+                : "border border-blue-700 text-blue-700 px-3 py-1 rounded-full text-sm font-bold hover:bg-blue-50 transition"
+              }>
+              الأدمن
+            </NavLink>
+          )}
         </>
       )}
 

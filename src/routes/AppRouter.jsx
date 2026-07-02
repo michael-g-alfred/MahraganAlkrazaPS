@@ -13,6 +13,7 @@ import Players from "../pages/Players";
 import { Toaster } from "react-hot-toast";
 import Login from "../pages/Login";
 import Admin from "../pages/Admin";
+import Brackets from "../pages/Brackets";
 import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 
@@ -62,6 +63,14 @@ const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <Admin />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "brackets",
+        element: (
+          <RequireAuth>
+            <Brackets />
           </RequireAuth>
         ),
       },

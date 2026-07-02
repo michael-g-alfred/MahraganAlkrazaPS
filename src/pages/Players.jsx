@@ -6,21 +6,11 @@ import SelectBox from "../components/SelectBox";
 import Pagination from "../components/Pagination";
 import EditPlayerModal from "../components/EditPlayerModal";
 import { useAuth } from "../context/AuthContext";
-import {
-  doc,
-  deleteDoc,
-  writeBatch,
-  getDocs,
-  collection,
-  updateDoc,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../utils/firebase";
+import { getPrivileges } from "../utils/permissions";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
-const ALLOWED_ACTION_EMAIL = import.meta.env.VITE_ALLOWED_ACTION?.toLowerCase();
-const ALLOWED_PAID_EMAIL = import.meta.env.VITE_ALLOWED_PAID?.toLowerCase();
 const ITEMS_PER_PAGE = 20;
 
 function getInitials(name = "") {
@@ -160,7 +150,7 @@ function PaidCheckbox({ playerId, paid, onToggle, canPaidAction }) {
 function PlayerCard({
   player,
   index,
-  canAction,
+  canDeletePlayer,
   canPaidAction,
   onDelete,
   onPaidToggle,
@@ -209,7 +199,7 @@ function PlayerCard({
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {canAction && (
+          {canDeletePlayer && (
             <button
               type="button"
               onClick={(e) => {
@@ -298,7 +288,7 @@ function PlayerCard({
             </DetailItem>
           </div>
 
-          {canAction && (
+          {canDeletePlayer && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -361,20 +351,16 @@ function normalizeArabicSearch(str) {
 export default function Players() {
   const { user } = useAuth();
 
-  const currentUserEmail = user?.email?.toLowerCase();
-  const canAction = currentUserEmail === ALLOWED_ACTION_EMAIL;
-  const canPaidAction = currentUserEmail === ALLOWED_PAID_EMAIL;
+  const privileges = getPrivileges(user?.email);
+  const canDeletePlayer = privileges.canDeletePlayer;
+  const canPaidAction = privileges.canTogglePaid;
+  const canExport = privileges.canExport;
 
   const [loadingFetch, errorFetch, players] = useFetch();
   const [localPlayers, setLocalPlayers] = useState([]);
-  const [deletingAll, setDeletingAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [editingPlayer, setEditingPlayer] = useState(null);
-
-  const [registrationClosed, setRegistrationClosed] = useState(false);
-  const [loadingRegStatus, setLoadingRegStatus] = useState(true);
-  const [togglingReg, setTogglingReg] = useState(false);
 
   // ── البحث بالاسم ─────────────────────────────────────────────
   const [searchName, setSearchName] = useState("");
@@ -389,39 +375,6 @@ export default function Players() {
     team: "",
     paid: "",
   });
-
-  useEffect(() => {
-    const fetchRegStatus = async () => {
-      try {
-        const snap = await getDoc(doc(db, "settings", "registration"));
-        if (snap.exists()) {
-          setRegistrationClosed(snap.data().closed === true);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setLoadingRegStatus(false);
-      }
-    };
-    fetchRegStatus();
-  }, []);
-
-  const handleToggleRegistration = async () => {
-    if (!canAction) return;
-    const newVal = !registrationClosed;
-    setTogglingReg(true);
-    try {
-      await setDoc(doc(db, "settings", "registration"), { closed: newVal });
-      setRegistrationClosed(newVal);
-      toast.success(newVal ? "🔒 تم غلق التسجيل" : "🔓 تم فتح التسجيل", {
-        duration: 3000,
-      });
-    } catch {
-      toast.error("فشل تغيير حالة التسجيل");
-    } finally {
-      setTogglingReg(false);
-    }
-  };
 
   useEffect(() => {
     setLocalPlayers(players);
@@ -601,31 +554,6 @@ export default function Players() {
       });
   }
 
-  async function handleDeleteAll() {
-    if (
-      !window.confirm(
-        `⚠️ حذف جميع اللاعبين (${localPlayers.length})؟ لا يمكن التراجع!`,
-      )
-    )
-      return;
-    setDeletingAll(true);
-    const backup = [...localPlayers];
-    setLocalPlayers([]);
-    setCurrentPage(1);
-    try {
-      const snapshot = await getDocs(collection(db, "players"));
-      const batch = writeBatch(db);
-      snapshot.docs.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-      toast.success("تم حذف جميع اللاعبين 🗑️");
-    } catch {
-      setLocalPlayers(backup);
-      toast.error("فشل الحذف ❌");
-    } finally {
-      setDeletingAll(false);
-    }
-  }
-
   function handleExportExcel() {
     const rows = filteredPlayers.map((p) => ({
       الاسم: p.name,
@@ -697,15 +625,6 @@ export default function Players() {
   if (localPlayers.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
-        {canAction && (
-          <div className="mb-4">
-            <RegistrationToggleButton
-              closed={registrationClosed}
-              loading={loadingRegStatus || togglingReg}
-              onToggle={handleToggleRegistration}
-            />
-          </div>
-        )}
         <svg
           className="w-16 h-16 text-slate-200"
           fill="none"
@@ -970,13 +889,8 @@ export default function Players() {
           </p>
         </div>
 
-        {canAction && (
+        {canExport && (
           <div className="flex items-center gap-2 flex-wrap">
-            <RegistrationToggleButton
-              closed={registrationClosed}
-              loading={loadingRegStatus || togglingReg}
-              onToggle={handleToggleRegistration}
-            />
             <button
               onClick={handleExportExcel}
               disabled={filteredPlayers.length === 0}
@@ -999,19 +913,6 @@ export default function Players() {
               </svg>
               Excel
             </button>
-            {/* <button
-              onClick={handleDeleteAll}
-              disabled={deletingAll || localPlayers.length === 0}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-                deletingAll || localPlayers.length === 0
-                  ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                  : "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer"
-              }`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              {deletingAll ? "جاري الحذف..." : "مسح الكل"}
-            </button> */}
           </div>
         )}
       </div>
@@ -1041,7 +942,7 @@ export default function Players() {
                 key={player.id}
                 player={player}
                 index={(currentPage - 1) * ITEMS_PER_PAGE + index}
-                canAction={canAction}
+                canDeletePlayer={canDeletePlayer}
                 canPaidAction={canPaidAction}
                 onDelete={handleDeleteItem}
                 onPaidToggle={handlePaidToggle}
@@ -1060,51 +961,3 @@ export default function Players() {
   );
 }
 
-function RegistrationToggleButton({ closed, loading, onToggle }) {
-  return (
-    <button
-      onClick={onToggle}
-      disabled={loading}
-      title={closed ? "فتح التسجيل" : "غلق التسجيل"}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-200 ${
-        loading ? "bg-slate-50 text-slate-300 border-slate-200 cursor-wait"
-        : closed ?
-          "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-700 hover:text-white cursor-pointer"
-        : "bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-700 hover:text-white cursor-pointer"
-      }`}>
-      {loading ?
-        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-      : closed ?
-        <svg
-          className="w-3.5 h-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-          />
-        </svg>
-      : <svg
-          className="w-3.5 h-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7a4 4 0 00-8 0v4h8V7z"
-          />
-        </svg>
-      }
-      {loading ?
-        "..."
-      : closed ?
-        "فتح التسجيل"
-      : "غلق التسجيل"}
-    </button>
-  );
-}

@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../utils/firebase";
+import React, { useState } from "react";
 import Header from "../components/Header";
 import stages from "../data/stages";
 import genders from "../data/genders";
@@ -10,6 +8,7 @@ import forms from "../data/forms";
 import Single from "../pages/Single";
 import Team from "../pages/Team";
 import SelectCard from "../components/SelectCard";
+import useSiteSettings from "../hooks/useSiteSettings";
 
 // أيقونة Tabler لكل لعبة
 const GAME_ICONS = {
@@ -89,30 +88,9 @@ export default function Home() {
     form: null,
   });
 
-  // ── حالة التسجيل من Firestore (real-time) ────────────────────
-  const [registrationClosed, setRegistrationClosed] = useState(false);
-  const [loadingRegStatus, setLoadingRegStatus] = useState(true);
-
-  useEffect(() => {
-    // نستخدم onSnapshot عشان التغيير يظهر فوري بدون ما المستخدم يريفريش
-    const unsub = onSnapshot(
-      doc(db, "settings", "registration"),
-      (snap) => {
-        if (snap.exists()) {
-          setRegistrationClosed(snap.data().closed === true);
-        } else {
-          setRegistrationClosed(false);
-        }
-        setLoadingRegStatus(false);
-      },
-      () => {
-        // لو فشل نفترض مفتوح
-        setRegistrationClosed(false);
-        setLoadingRegStatus(false);
-      },
-    );
-    return () => unsub();
-  }, []);
+  // ── حالة التسجيل + الظاهر من الألعاب/المراحل من Firestore (real-time) ──
+  const { closed: registrationClosed, loading: loadingRegStatus, visibility } =
+    useSiteSettings();
 
   // الخطوة الحالية المفتوحة
   const currentStep =
@@ -123,16 +101,21 @@ export default function Home() {
     : !selection.form ? 5
     : 6;
 
-  // فلترة المراحل حسب اللعبة
+  // الألعاب الظاهرة فقط (حسب اختيار الأدمن)
+  const visibleGames = games.filter((g) => visibility.games[g.name] !== false);
+
+  // فلترة المراحل حسب اللعبة + إظهار الأدمن
   const filteredStages =
     selection.game ?
-      stages.filter((stage) =>
-        selection.game.name === "جرى" ?
-          stage.name === "المرحلة الأولى (أ)" ||
-          stage.name === "المرحلة الأولى (ب)"
-        : stage.name !== "المرحلة الأولى (أ)" &&
-          stage.name !== "المرحلة الأولى (ب)",
-      )
+      stages
+        .filter((stage) =>
+          selection.game.name === "جرى" ?
+            stage.name === "المرحلة الأولى (أ)" ||
+            stage.name === "المرحلة الأولى (ب)"
+          : stage.name !== "المرحلة الأولى (أ)" &&
+            stage.name !== "المرحلة الأولى (ب)",
+        )
+        .filter((stage) => visibility.stages[stage.name] !== false)
     : [];
 
   // فلترة الاستمارات حسب اللعبة
@@ -200,7 +183,7 @@ export default function Home() {
                 <section>
                   <StepTitle step={2} total={TOTAL_STEPS} title="اختر اللعبة" />
                   <div className="grid grid-cols-2 gap-3">
-                    {games.map((g) => (
+                    {visibleGames.map((g) => (
                       <SelectCard
                         key={g.name}
                         isSelected={selection.game === g}
