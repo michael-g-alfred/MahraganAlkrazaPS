@@ -78,7 +78,7 @@ function DangerZoneCard() {
             "bg-slate-100 text-slate-400 cursor-wait"
           : "bg-red-600 text-white hover:bg-red-700 shadow-sm"
         }`}>
-        {deleting ? "جارِ المسح..." : "🗑️ مسح كل الداتا (لاعبين + قرعات)"}
+        {deleting ? "جارِ المسح..." : "مسح كل الداتا (لاعبين + قرعات)"}
       </button>
     </div>
   );
@@ -89,11 +89,11 @@ function VisibilityCard({ visibility, onGameToggle, onStageToggle }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mb-4">
       <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">
-        الظاهر وقت التسجيل
+        إعدادات التسجيل
       </p>
 
       <p className="text-xs font-semibold text-slate-500 mb-2">الألعاب</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1">
         {gamesData.map((g) => (
           <label
             key={g.name}
@@ -109,7 +109,7 @@ function VisibilityCard({ visibility, onGameToggle, onStageToggle }) {
       </div>
 
       <p className="text-xs font-semibold text-slate-500 mb-2">المراحل</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1">
         {stagesData.map((s) => (
           <label
             key={s.name}
@@ -224,10 +224,13 @@ export default function Admin() {
 
   // ─────────────────────────────────────────────────────────────────
   const Header = (
-    <div className="flex justify-between items-center bg-blue-700 text-white px-5 py-3.5 rounded-2xl shadow-md mb-5">
-      <div className="flex items-center gap-3">
+    <div
+      dir="rtl"
+      className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-blue-700 text-white px-4 py-3.5 sm:px-5 rounded-2xl shadow-md mb-5 gap-3 sm:gap-0">
+      {/* القسم الأيمن: الشعار والمعلومات */}
+      <div className="flex items-center gap-3 w-full sm:w-auto">
         <svg
-          className="w-5 h-5 text-blue-200"
+          className="w-5 h-5 text-blue-200 flex-shrink-0"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -238,22 +241,26 @@ export default function Admin() {
             d="M13 10V3L4 14h7v7l9-11h-7z"
           />
         </svg>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5">
+
+        <div className="flex flex-col gap-1 min-w-0">
           <h1 className="text-base font-bold leading-none">لوحة الأدمن</h1>
-          <span className="text-xs text-white font-mono bg-blue-900 px-2.5 py-0.5 rounded-full border border-blue-600/30">
+          <span
+            className="text-xs text-white font-mono bg-blue-900 px-2.5 py-1 rounded-full border border-blue-600/30 truncate max-w-[200px] xs:max-w-[280px] sm:max-w-none"
+            title={`${user?.email} — ${privileges.label}`}>
             {user?.email} — {privileges.label}
           </span>
         </div>
       </div>
 
+      {/* القسم الأيسر: زر الخروج */}
       <button
         onClick={() => {
           logout();
           navigate("/login");
         }}
-        className="flex items-center text-xs px-3.5 py-1.5 rounded-full font-semibold bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white cursor-pointer flex-shrink-0">
+        className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition-colors duration-200 cursor-pointer flex-shrink-0 mr-auto sm:mr-0">
         <svg
-          className="w-3.5 h-3.5"
+          className="w-3.5 h-3.5 transform rotate-180"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -264,7 +271,7 @@ export default function Admin() {
             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
           />
         </svg>
-        خروج
+        <span>خروج</span>
       </button>
     </div>
   );
@@ -308,13 +315,15 @@ export default function Admin() {
       {Header}
 
       <div className="px-1">
-        <SiteToggleCard
-          closed={closed}
-          loading={settingsLoading}
-          onToggle={toggleSiteClosed}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <SiteToggleCard
+            closed={closed}
+            loading={settingsLoading}
+            onToggle={toggleSiteClosed}
+          />
 
-        <DangerZoneCard />
+          <DangerZoneCard />
+        </div>
 
         <VisibilityCard
           visibility={visibility}
