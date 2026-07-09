@@ -84,44 +84,69 @@ function DangerZoneCard() {
   );
 }
 
-// ─── إظهار/إخفاء المراحل والألعاب وقت التسجيل ──────────────────────
+// ─── إظهار/إخفاء الألعاب، ولكل لعبة مراحلها الخاصة ──────────────────
 function VisibilityCard({ visibility, onGameToggle, onStageToggle }) {
+  const [expandedGame, setExpandedGame] = useState(null);
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mb-4">
       <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">
         إعدادات التسجيل
       </p>
 
-      <p className="text-xs font-semibold text-slate-500 mb-2">الألعاب</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1">
-        {gamesData.map((g) => (
-          <label
-            key={g.name}
-            className="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={visibility.games[g.name] !== false}
-              onChange={(e) => onGameToggle(g.name, e.target.checked)}
-            />
-            {g.name}
-          </label>
-        ))}
-      </div>
+      <p className="text-xs font-semibold text-slate-500 mb-2">
+        الألعاب والمراحل
+      </p>
 
-      <p className="text-xs font-semibold text-slate-500 mb-2">المراحل</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1">
-        {stagesData.map((s) => (
-          <label
-            key={s.name}
-            className="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={visibility.stages[s.name] !== false}
-              onChange={(e) => onStageToggle(s.name, e.target.checked)}
-            />
-            {s.name}
-          </label>
-        ))}
+      <div className="flex flex-col gap-2">
+        {gamesData.map((g) => {
+          const isOpen = expandedGame === g.name;
+          const gameStages = visibility.stages[g.name] || {};
+
+          return (
+            <div
+              key={g.name}
+              className="border border-slate-200 rounded-xl overflow-hidden">
+              {/* رأس اللعبة: تفعيل/تعطيل اللعبة + فتح قائمة مراحلها */}
+              <div className="flex items-center justify-between bg-slate-50 px-3 py-2">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={visibility.games[g.name] !== false}
+                    onChange={(e) => onGameToggle(g.name, e.target.checked)}
+                  />
+                  <span className="font-semibold">{g.name}</span>
+                </label>
+
+                <button
+                  onClick={() => setExpandedGame(isOpen ? null : g.name)}
+                  className="text-xs text-blue-700 font-semibold px-2 py-1 hover:underline">
+                  {isOpen ? "إخفاء المراحل ▲" : "تعديل المراحل ▼"}
+                </button>
+              </div>
+
+              {/* مراحل اللعبة دي بس */}
+              {isOpen && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
+                  {stagesData.map((s) => (
+                    <label
+                      key={s.name}
+                      className="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={gameStages[s.name] !== false}
+                        onChange={(e) =>
+                          onStageToggle(g.name, s.name, e.target.checked)
+                        }
+                      />
+                      {s.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

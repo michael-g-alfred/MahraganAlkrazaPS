@@ -7,16 +7,24 @@ import stages from "../data/stages";
 const REG_DOC = doc(db, "settings", "registration");
 const VISIBILITY_DOC = doc(db, "settings", "visibility");
 
+// دلوقتي: visibility.stages[gameName][stageName] = true/false
+// كل لعبة عندها خريطة مراحل مستقلة
 function defaultVisibility() {
   const g = {};
   games.forEach((game) => (g[game.name] = true));
+
   const s = {};
-  stages.forEach((stage) => (s[stage.name] = true));
+  games.forEach((game) => {
+    s[game.name] = {};
+    stages.forEach((stage) => (s[game.name][stage.name] = true));
+  });
+
   return { games: g, stages: s };
 }
 
 /**
- * حالة فتح/غلق الموقع + إظهار/إخفاء الألعاب والمراحل وقت التسجيل.
+ * حالة فتح/غلق الموقع + إظهار/إخفاء الألعاب، وإظهار/إخفاء المراحل
+ * لكل لعبة على حدة وقت التسجيل.
  * أي تغيير بيتحفظ في Firestore ويظهر فورًا لكل المستخدمين (real-time).
  */
 export default function useSiteSettings() {
@@ -31,14 +39,27 @@ export default function useSiteSettings() {
     });
 
     const unsub2 = onSnapshot(VISIBILITY_DOC, (snap) => {
+      const defaults = defaultVisibility();
+
       if (snap.exists()) {
         const data = snap.data();
+        const savedStages = data.stages || {};
+
+        // دمج المراحل المحفوظة مع الديفولت، لعبة لعبة
+        const mergedStages = {};
+        games.forEach((game) => {
+          mergedStages[game.name] = {
+            ...defaults.stages[game.name],
+            ...(savedStages[game.name] || {}),
+          };
+        });
+
         setVisibility({
-          games: { ...defaultVisibility().games, ...(data.games || {}) },
-          stages: { ...defaultVisibility().stages, ...(data.stages || {}) },
+          games: { ...defaults.games, ...(data.games || {}) },
+          stages: mergedStages,
         });
       } else {
-        setVisibility(defaultVisibility());
+        setVisibility(defaults);
       }
     });
 
@@ -64,11 +85,18 @@ export default function useSiteSettings() {
     [visibility],
   );
 
+  // بقى بياخد اسم اللعبة كمان عشان يعرف يظبط المرحلة جوه اللعبة الصح
   const setStageVisible = useCallback(
-    async (name, visible) => {
+    async (gameName, stageName, visible) => {
       const next = {
         ...visibility,
-        stages: { ...visibility.stages, [name]: visible },
+        stages: {
+          ...visibility.stages,
+          [gameName]: {
+            ...visibility.stages[gameName],
+            [stageName]: visible,
+          },
+        },
       };
       setVisibility(next);
       await setDoc(VISIBILITY_DOC, next, { merge: true });

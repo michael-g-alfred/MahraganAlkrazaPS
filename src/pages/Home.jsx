@@ -5,8 +5,8 @@ import genders from "../data/genders";
 import games from "../data/games";
 import churches from "../data/churches";
 import forms from "../data/forms";
-import Single from "../pages/Single";
-import Team from "../pages/Team";
+import Single from "../components/Single";
+import Team from "../components/Team";
 import SelectCard from "../components/SelectCard";
 import useSiteSettings from "../hooks/useSiteSettings";
 
@@ -89,8 +89,11 @@ export default function Home() {
   });
 
   // ── حالة التسجيل + الظاهر من الألعاب/المراحل من Firestore (real-time) ──
-  const { closed: registrationClosed, loading: loadingRegStatus, visibility } =
-    useSiteSettings();
+  const {
+    closed: registrationClosed,
+    loading: loadingRegStatus,
+    visibility,
+  } = useSiteSettings();
 
   // الخطوة الحالية المفتوحة
   const currentStep =
@@ -104,7 +107,7 @@ export default function Home() {
   // الألعاب الظاهرة فقط (حسب اختيار الأدمن)
   const visibleGames = games.filter((g) => visibility.games[g.name] !== false);
 
-  // فلترة المراحل حسب اللعبة + إظهار الأدمن
+  // فلترة المراحل حسب اللعبة + إظهار الأدمن (خاص باللعبة المختارة فقط)
   const filteredStages =
     selection.game ?
       stages
@@ -115,7 +118,11 @@ export default function Home() {
           : stage.name !== "المرحلة الأولى (أ)" &&
             stage.name !== "المرحلة الأولى (ب)",
         )
-        .filter((stage) => visibility.stages[stage.name] !== false)
+        .filter(
+          (stage) =>
+            (visibility.stages[selection.game.name] || {})[stage.name] !==
+            false,
+        )
     : [];
 
   // فلترة الاستمارات حسب اللعبة
