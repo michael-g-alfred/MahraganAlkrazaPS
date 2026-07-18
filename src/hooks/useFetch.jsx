@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
 export function normalizeField(field) {
@@ -17,8 +17,10 @@ export default function useFetch() {
     setLoadingFetch(true);
     setErrorFetch(null);
 
+    const playersQuery = query(collection(db, "players"), orderBy("name"));
+
     const unsubscribe = onSnapshot(
-      collection(db, "players"),
+      playersQuery,
       (snapshot) => {
         const arr = snapshot.docs.map((doc) => {
           const raw = doc.data();
