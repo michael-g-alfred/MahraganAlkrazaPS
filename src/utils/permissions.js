@@ -1,33 +1,41 @@
 const ROLES = {
   "michoolgeorge@gmail.com": {
     label: "أدمن عام",
-    fullAdmin: true,
+    canEditDashboard: true,
     canDeletePlayer: true,
+    canToggleDetails: true,
     canTogglePaid: false,
     canExport: true,
+    canRegisterResults: true,
   },
   "2@2.com": {
     label: "مسؤول الدفع",
-    fullAdmin: false,
+    canEditDashboard: false,
     canDeletePlayer: false,
+    canToggleDetails: false,
     canTogglePaid: true,
     canExport: false,
+    canRegisterResults: true,
   },
   "1@1.com": {
     label: "مشاهدة فقط",
-    fullAdmin: false,
+    canEditDashboard: false,
     canDeletePlayer: false,
+    canToggleDetails: false,
     canTogglePaid: false,
     canExport: false,
+    canRegisterResults: true,
   },
 };
 
 const DEFAULT_PRIVILEGES = {
   label: "بدون صلاحيات",
-  fullAdmin: false,
+  canEditDashboard: false,
   canDeletePlayer: false,
+  canToggleDetails: false,
   canTogglePaid: false,
   canExport: false,
+  canRegisterResults: false,
 };
 
 export function getPrivileges(email) {

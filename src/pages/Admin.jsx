@@ -302,7 +302,7 @@ export default function Admin() {
   );
 
   // ─── مفيش صلاحيات إدارية على الإطلاق (محتوى فاضي) ─────────────────
-  if (!privileges.fullAdmin) {
+  if (!privileges.canEditDashboard) {
     return (
       <div className="min-h-screen max-w-3xl mx-auto" dir="rtl">
         {Header}

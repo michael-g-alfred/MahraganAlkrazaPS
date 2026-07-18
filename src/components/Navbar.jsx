@@ -43,17 +43,16 @@ export default function Navbar() {
             }>
             القرعات
           </NavLink>
-          {privileges.fullAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                isActive ?
-                  "bg-blue-700 text-white px-3 py-1 rounded-full text-sm font-bold"
-                : "border border-blue-700 text-blue-700 px-3 py-1 rounded-full text-sm font-bold hover:bg-blue-50 transition"
-              }>
-              الأدمن
-            </NavLink>
-          )}
+
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              isActive ?
+                "bg-blue-700 text-white px-3 py-1 rounded-full text-sm font-bold"
+              : "border border-blue-700 text-blue-700 px-3 py-1 rounded-full text-sm font-bold hover:bg-blue-50 transition"
+            }>
+            الأدمن
+          </NavLink>
         </>
       )}
 

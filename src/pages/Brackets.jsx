@@ -28,9 +28,8 @@ function BracketBlock({ bracket, canEdit }) {
   const [readOnlyRoundIdx, setReadOnlyRoundIdx] = useState(0);
 
   const activeRoundIdx = canEdit ? editable.activeRoundIdx : readOnlyRoundIdx;
-  const setActiveRoundIdx = canEdit ?
-    editable.setActiveRoundIdx
-  : setReadOnlyRoundIdx;
+  const setActiveRoundIdx =
+    canEdit ? editable.setActiveRoundIdx : setReadOnlyRoundIdx;
 
   const displayedBracket = canEdit ? editable.localBracket : bracket;
   const currentRound = displayedBracket?.rounds?.[activeRoundIdx];
@@ -145,7 +144,7 @@ export default function Brackets() {
           <BracketBlock
             key={bracket.id}
             bracket={bracket}
-            canEdit={privileges.fullAdmin}
+            canEdit={privileges.canRegisterResults}
           />
         ))
       }

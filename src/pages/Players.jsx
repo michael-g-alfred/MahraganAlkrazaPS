@@ -152,6 +152,7 @@ function PlayerCard({
   index,
   canDeletePlayer,
   canPaidAction,
+  canToggleDetails,
   onDelete,
   onPaidToggle,
   onEdit,
@@ -161,6 +162,7 @@ function PlayerCard({
   const initials = getInitials(player.name);
 
   const handleToggle = () => {
+    if (!canToggleDetails) return;
     if (window.getSelection()?.toString()) return;
     setExpanded((v) => !v);
   };
@@ -171,12 +173,19 @@ function PlayerCard({
         expanded ? "border-blue-300 shadow-sm border-2" : "border-slate-200"
       }`}>
       <div
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors"
+        className={`flex items-center gap-3 px-4 py-3.5 transition-colors ${
+          canToggleDetails ?
+            "cursor-pointer hover:bg-slate-50"
+          : "cursor-default"
+        }`}
         onClick={handleToggle}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === "Enter" && setExpanded((v) => !v)}
-        aria-expanded={expanded}
+        role={canToggleDetails ? "button" : undefined}
+        tabIndex={canToggleDetails ? 0 : undefined}
+        onKeyDown={(e) => {
+          if (!canToggleDetails) return;
+          if (e.key === "Enter") setExpanded((v) => !v);
+        }}
+        aria-expanded={canToggleDetails ? expanded : undefined}
         aria-label={`تفاصيل ${player.name}`}>
         <span className="text-xs text-slate-400 w-6 text-center flex-shrink-0 font-mono font-bold select-none">
           {index + 1}
@@ -236,22 +245,24 @@ function PlayerCard({
           </div>
         </div>
 
-        <svg
-          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 select-none ${expanded ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        {canToggleDetails && (
+          <svg
+            className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200 select-none ${expanded ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        )}
       </div>
 
-      {expanded && (
+      {canToggleDetails && expanded && (
         <div className="border-t border-slate-100 bg-slate-50/60 px-4 pb-4 pt-3">
           <div className="flex sm:hidden items-center gap-2 mb-3">
             <GenderBadge gender={player.gender} />
@@ -355,6 +366,7 @@ export default function Players() {
   const canDeletePlayer = privileges.canDeletePlayer;
   const canPaidAction = privileges.canTogglePaid;
   const canExport = privileges.canExport;
+  const canToggleDetails = privileges.canToggleDetails;
 
   const [loadingFetch, errorFetch, players] = useFetch();
   const [localPlayers, setLocalPlayers] = useState([]);
@@ -944,6 +956,7 @@ export default function Players() {
                 index={(currentPage - 1) * ITEMS_PER_PAGE + index}
                 canDeletePlayer={canDeletePlayer}
                 canPaidAction={canPaidAction}
+                canToggleDetails={canToggleDetails}
                 onDelete={handleDeleteItem}
                 onPaidToggle={handlePaidToggle}
                 onEdit={setEditingPlayer}
@@ -960,4 +973,3 @@ export default function Players() {
     </div>
   );
 }
-
