@@ -265,6 +265,14 @@ export default function Admin() {
 
   const isTeam = selectedForm === "جماعى";
 
+  const teamsCount = useMemo(
+    () =>
+      isTeam ?
+        new Set(filteredPlayers.map((p) => p.team).filter(Boolean)).size
+      : 0,
+    [filteredPlayers, isTeam],
+  );
+
   const {
     localBracket,
     bracketLoading,
@@ -435,14 +443,16 @@ export default function Admin() {
             {bracketKey && (
               <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
                 <p className="text-xs text-slate-500">
-                  عدد اللاعبين:{" "}
+                  {isTeam ? "عدد الفرق:" : "عدد اللاعبين:"}{" "}
                   <span className="font-bold text-blue-700">
-                    {filteredPlayers.length}
+                    {isTeam ? teamsCount : filteredPlayers.length}
                   </span>
                 </p>
-                {filteredPlayers.length < 1 && (
+                {(isTeam ? teamsCount < 1 : filteredPlayers.length < 1) && (
                   <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                    لا يوجد لاعبون في هذه المجموعة
+                    {isTeam ?
+                      "لا يوجد فرق في هذه المجموعة"
+                    : "لا يوجد لاعبون في هذه المجموعة"}
                   </span>
                 )}
               </div>

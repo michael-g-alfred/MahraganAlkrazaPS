@@ -1,6 +1,3 @@
-// مكونات عرض فقط (read-only) لعرض القرعة في صفحة /brackets
-// نفس تصميم كروت الأدمن بالظبط لكن من غير أي تفاعل أو تعديل
-
 export function ReadOnlyChampionCard({ match }) {
   const winners = match.p1.split("\n");
   const isMultiple = winners.length > 1;
@@ -59,7 +56,11 @@ function ReadOnlyPlayerRow({ name, score, isWinner, isRelay }) {
           viewBox="0 0 24 24"
           stroke="currentColor"
           strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
         </svg>
       )}
       <span
@@ -140,9 +141,9 @@ export function ReadOnlyChurchCard({ match }) {
   return (
     <div
       className={`bg-white rounded-2xl p-4 border shadow-sm ${
-        hasChurchWinner ? "border-emerald-300 bg-emerald-50/30" : (
-          "border-slate-200"
-        )
+        hasChurchWinner ?
+          "border-emerald-300 bg-emerald-50/30"
+        : "border-slate-200"
       }`}>
       <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
         <div className="w-2 h-2 rounded-full bg-blue-700"></div>
@@ -174,7 +175,11 @@ export function ReadOnlyChurchCard({ match }) {
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
           <p className="text-sm font-semibold text-emerald-800">
             {winnerNames.includes(" و ") ? "أسرع اللاعبين" : "أسرع لاعب"}:{" "}

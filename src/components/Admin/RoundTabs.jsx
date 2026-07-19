@@ -11,8 +11,7 @@ export default function RoundTabs({ rounds, activeRoundIdx, onSelect }) {
                        text-xs font-semibold transition-all duration-200 border ${
                          activeRoundIdx === idx ?
                            "bg-blue-700 text-white border-blue-700 shadow-sm"
-                         : isDone ?
-                           "bg-emerald-50 text-emerald-700 border-emerald-200"
+                         : isDone ? "bg-blue-100 text-blue-700 border-blue-700"
                          : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
                        }`}>
             {isDone && activeRoundIdx !== idx && (
