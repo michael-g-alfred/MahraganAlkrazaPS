@@ -37,31 +37,44 @@ function SiteToggleCard({ closed, loading, onToggle }) {
   );
 }
 
-// ─── زرار مسح كل الداتا ─────────────────────────────────────────────
+// ─── زراير مسح الداتا (منفصلة: لاعبين / قرعات) ──────────────────────
 function DangerZoneCard() {
-  const [deleting, setDeleting] = useState(false);
+  const [deletingPlayers, setDeletingPlayers] = useState(false);
+  const [deletingBrackets, setDeletingBrackets] = useState(false);
 
-  const handleDeleteAllData = async () => {
+  const handleDeletePlayers = async () => {
     if (
-      !window.confirm(
-        "سيتم مسح كل اللاعبين وكل القرعات نهائيًا ولا يمكن التراجع. متأكد؟",
-      )
+      !window.confirm("سيتم مسح كل اللاعبين نهائيًا ولا يمكن التراجع. متأكد؟")
     )
       return;
-    if (!window.confirm("تأكيد أخير: هل أنت متأكد 100% من مسح كل البيانات؟"))
+    if (!window.confirm("تأكيد أخير: هل أنت متأكد 100% من مسح كل اللاعبين؟"))
       return;
 
-    setDeleting(true);
+    setDeletingPlayers(true);
     try {
       const playersCount = await deleteCollection("players");
-      const bracketsCount = await deleteCollection("brackets");
-      toast.success(
-        `تم مسح ${playersCount} لاعب و ${bracketsCount} قرعة بنجاح`,
-      );
+      toast.success(`تم مسح ${playersCount} لاعب بنجاح`);
     } catch {
-      toast.error("فشل مسح البيانات");
+      toast.error("فشل مسح اللاعبين");
     } finally {
-      setDeleting(false);
+      setDeletingPlayers(false);
+    }
+  };
+
+  const handleDeleteBrackets = async () => {
+    if (!window.confirm("سيتم مسح كل القرعات نهائيًا ولا يمكن التراجع. متأكد؟"))
+      return;
+    if (!window.confirm("تأكيد أخير: هل أنت متأكد 100% من مسح كل القرعات؟"))
+      return;
+
+    setDeletingBrackets(true);
+    try {
+      const bracketsCount = await deleteCollection("brackets");
+      toast.success(`تم مسح ${bracketsCount} قرعة بنجاح`);
+    } catch {
+      toast.error("فشل مسح القرعات");
+    } finally {
+      setDeletingBrackets(false);
     }
   };
 
@@ -70,16 +83,29 @@ function DangerZoneCard() {
       <p className="text-xs font-semibold text-red-400 mb-3 uppercase tracking-wide">
         منطقة الخطر
       </p>
-      <button
-        onClick={handleDeleteAllData}
-        disabled={deleting}
-        className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ${
-          deleting ?
-            "bg-slate-100 text-slate-400 cursor-wait"
-          : "bg-red-600 text-white hover:bg-red-700 shadow-sm"
-        }`}>
-        {deleting ? "جارِ المسح..." : "مسح كل الداتا (لاعبين + قرعات)"}
-      </button>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button
+          onClick={handleDeletePlayers}
+          disabled={deletingPlayers}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ${
+            deletingPlayers ?
+              "bg-slate-100 text-slate-400 cursor-wait"
+            : "bg-red-600 text-white hover:bg-red-700 shadow-sm"
+          }`}>
+          {deletingPlayers ? "جارِ المسح..." : "مسح كل اللاعبين"}
+        </button>
+
+        <button
+          onClick={handleDeleteBrackets}
+          disabled={deletingBrackets}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all duration-200 ${
+            deletingBrackets ?
+              "bg-slate-100 text-slate-400 cursor-wait"
+            : "bg-red-600 text-white hover:bg-red-700 shadow-sm"
+          }`}>
+          {deletingBrackets ? "جارِ المسح..." : "مسح كل القرعات"}
+        </button>
+      </div>
     </div>
   );
 }
