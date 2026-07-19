@@ -49,9 +49,17 @@ function shuffleArray(arr) {
 export default function generateBracket(items, isTeam = false) {
   if (items.length === 0) return null;
 
-  if (items.length === 1) {
-    const p = items[0];
-    const name = p.church ? `${p.name}-${p.church}` : p.name || "؟";
+  const isRelay = items[0]?.game && items[0].game.includes("جرى");
+
+  const soloCheck =
+    isTeam ? [...new Map(items.map((p) => [p.team, p])).values()] : items;
+
+  if (!isRelay && soloCheck.length === 1) {
+    const p = soloCheck[0];
+    const name =
+      isTeam ? p.church || p.team || "؟"
+      : p.church ? `${p.name}-${p.church}`
+      : p.name || "؟";
     return {
       rounds: [
         {
@@ -71,7 +79,6 @@ export default function generateBracket(items, isTeam = false) {
     };
   }
 
-  const isRelay = items[0]?.game && items[0].game.includes("جرى");
   const firstRoundMatches = [];
 
   if (isRelay) {
@@ -96,11 +103,9 @@ export default function generateBracket(items, isTeam = false) {
       });
     });
   } else {
-    const unique =
-      isTeam ? [...new Map(items.map((p) => [p.team, p])).values()] : items;
-    const shuffled = shuffleArray(unique);
+    const shuffled = shuffleArray(soloCheck);
     const getName = (x) => {
-      if (isTeam) return x.team || "؟";
+      if (isTeam) return x.church || x.team || "؟";
       return x.church ? `${x.name}-${x.church}` : x.name || "؟";
     };
     const players = shuffled.map((p) => getName(p));
@@ -201,9 +206,7 @@ export function propagateWinners(rounds) {
         const championMatches = currentRound.matches.filter(
           (m) => parseFloat(m.winnerTime) === bestTime,
         );
-        const championNames = championMatches
-          .map((m) => m.winner)
-          .join("\n");
+        const championNames = championMatches.map((m) => m.winner).join("\n");
 
         rounds.push({
           roundName: "بطل المسابقة",
