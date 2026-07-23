@@ -13,12 +13,6 @@ import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 const ITEMS_PER_PAGE = 20;
 
-function getInitials(name = "") {
-  const parts = name.trim().split(" ").filter(Boolean);
-  if (parts.length === 0) return "؟";
-  return parts[0][0];
-}
-
 const AVATAR_COLORS = [
   { bg: "#dbeafe", text: "#1e40af" },
   { bg: "#dcfce7", text: "#166534" },
@@ -159,7 +153,6 @@ function PlayerCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = avatarColor(player.name);
-  const initials = getInitials(player.name);
 
   const handleToggle = () => {
     if (!canToggleDetails) return;
@@ -190,12 +183,6 @@ function PlayerCard({
         <span className="text-xs text-slate-400 w-6 text-center flex-shrink-0 font-mono font-bold select-none">
           {index + 1}
         </span>
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 select-none"
-          style={{ background: color.bg, color: color.text }}
-          aria-hidden="true">
-          {initials}
-        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-900 truncate leading-tight select-text">
             {player.name}
