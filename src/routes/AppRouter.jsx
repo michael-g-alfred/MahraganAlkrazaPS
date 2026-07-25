@@ -14,7 +14,9 @@ import { Toaster } from "react-hot-toast";
 import Login from "../pages/Login";
 import Admin from "../pages/Admin";
 import Brackets from "../pages/Brackets";
+import Statistics from "../pages/Statistics";
 import { useAuth } from "../context/AuthContext";
+import { getPrivileges } from "../utils/permissions";
 import Loader from "../components/Loader";
 
 function RootLayout() {
@@ -40,6 +42,22 @@ function RequireAuth({ children }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+// صفحة الإحصائيات: تتطلب تسجيل دخول + صلاحية أدمن عام (full access) فقط
+function RequireFullAdmin({ children }) {
+  const { user, loadingAuth } = useAuth();
+  if (loadingAuth) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader size={10} />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  const privileges = getPrivileges(user?.email);
+  if (!privileges.canViewStats) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -72,6 +90,14 @@ const router = createBrowserRouter([
           <RequireAuth>
             <Brackets />
           </RequireAuth>
+        ),
+      },
+      {
+        path: "statistics",
+        element: (
+          <RequireFullAdmin>
+            <Statistics />
+          </RequireFullAdmin>
         ),
       },
     ],

@@ -44,6 +44,18 @@ export default function Navbar() {
             القرعات
           </NavLink>
 
+          {privileges.canViewStats && (
+            <NavLink
+              to="/statistics"
+              className={({ isActive }) =>
+                isActive ?
+                  "text-blue-700 font-semibold"
+                : "text-gray-500 hover:text-blue-500 transition-colors duration-200"
+              }>
+              الإحصائيات
+            </NavLink>
+          )}
+
           <NavLink
             to="/admin"
             className={({ isActive }) =>

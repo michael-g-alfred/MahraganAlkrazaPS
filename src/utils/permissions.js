@@ -7,6 +7,8 @@ const ROLES = {
     canTogglePaid: false,
     canExport: true,
     canRegisterResults: true,
+    canViewStats: true,
+    canDownloadReports: true,
   },
   "2@2.com": {
     label: "مسؤول الدفع",
@@ -16,6 +18,8 @@ const ROLES = {
     canTogglePaid: true,
     canExport: false,
     canRegisterResults: true,
+    canViewStats: true,
+    canDownloadReports: false,
   },
   "1@1.com": {
     label: "مشاهدة فقط",
@@ -25,6 +29,8 @@ const ROLES = {
     canTogglePaid: false,
     canExport: false,
     canRegisterResults: true,
+    canViewStats: true,
+    canDownloadReports: false,
   },
 };
 
@@ -36,6 +42,8 @@ const DEFAULT_PRIVILEGES = {
   canTogglePaid: false,
   canExport: false,
   canRegisterResults: false,
+  canViewStats: false,
+  canDownloadReports: false,
 };
 
 export function getPrivileges(email) {
